@@ -10,25 +10,22 @@ import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.border.EmptyBorder;
 import java.awt.BorderLayout;
-import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.Font;
 import java.awt.GridLayout;
 import java.awt.event.ActionListener;
-import java.util.EnumMap;
-import java.util.Map;
 
 /**
- * Clube Geeks: busca um cliente JÁ cadastrado e permite assinar/gerenciar o plano.
+ * Clube Geeks: busca um cliente JÁ cadastrado e permite assinar ou cancelar o plano único do clube.
  * O cadastro de novos clientes fica somente na tela Cadastros.
  */
 public class PainelClube extends PainelPagina {
     private final CampoGeeks campoBusca = new CampoGeeks("Nome ou CPF do cliente");
     private final BotaoGeeks btBuscar = new BotaoGeeks("Buscar", Icone.Tipo.LUPA, BotaoGeeks.Estilo.PREENCHIDO);
-    private final BotaoGeeks btGerenciar = new BotaoGeeks("Gerenciar assinatura", Icone.Tipo.LISTA, BotaoGeeks.Estilo.CONTORNO);
+    private final BotaoGeeks btAssinar = new BotaoGeeks("Assinar", null, BotaoGeeks.Estilo.ESCURO);
+    private final BotaoGeeks btCancelar = new BotaoGeeks("Cancelar assinatura", Icone.Tipo.LISTA, BotaoGeeks.Estilo.CONTORNO);
     private final JPanel areaCliente = Componentes.transparente(new BorderLayout());
-    private final Map<Plano, BotaoGeeks> botoesPlano = new EnumMap<>(Plano.class);
     private ActionListener listenerNovoCliente;
 
     public PainelClube() {
@@ -51,53 +48,42 @@ public class PainelClube extends PainelPagina {
         esquerda.add(envoltorio, BorderLayout.CENTER);
 
         JPanel direita = Componentes.transparente(new BorderLayout(0, 16));
-        direita.add(Componentes.rotuloIcone("Escolha a assinatura", Icone.Tipo.ESTRELA, Tema.AMARELO, 22), BorderLayout.NORTH);
-        JPanel planos = Componentes.transparente(new GridLayout(1, 2, 16, 0));
-        planos.add(criarCartaoPlano(Plano.BASICO, false));
-        planos.add(criarCartaoPlano(Plano.PREMIUM, true));
-        JPanel blocoPlanos = Componentes.transparente(new BorderLayout(0, 16));
-        blocoPlanos.add(planos, BorderLayout.CENTER);
-        blocoPlanos.add(btGerenciar, BorderLayout.SOUTH);
-        JPanel envolvePlanos = Componentes.transparente(new BorderLayout());
-        envolvePlanos.add(blocoPlanos, BorderLayout.NORTH);
-        direita.add(envolvePlanos, BorderLayout.CENTER);
+        direita.add(Componentes.rotuloIcone("Assinatura do clube", Icone.Tipo.ESTRELA, Tema.AMARELO, 22), BorderLayout.NORTH);
+        JPanel bloco = Componentes.transparente(new BorderLayout(0, 16));
+        bloco.add(criarCartaoPlano(Plano.CLUBE), BorderLayout.CENTER);
+        bloco.add(btCancelar, BorderLayout.SOUTH);
+        JPanel envolvePlano = Componentes.transparente(new BorderLayout());
+        envolvePlano.add(bloco, BorderLayout.NORTH);
+        direita.add(envolvePlano, BorderLayout.CENTER);
 
         corpo.add(esquerda);
         corpo.add(direita);
         getCorpo().add(corpo, BorderLayout.CENTER);
+        btAssinar.setActionCommand(Plano.CLUBE.name());
         limparSelecao();
     }
 
-    private JComponent criarCartaoPlano(Plano plano, boolean destaque) {
-        Color fundo = destaque ? Tema.AMARELO : Tema.CARTAO;
-        Color texto = destaque ? Tema.FUNDO : Tema.BRANCO;
-        CartaoGeeks c = new CartaoGeeks(fundo, destaque ? Tema.AMARELO : Tema.BORDA, false);
+    private JComponent criarCartaoPlano(Plano plano) {
+        CartaoGeeks c = new CartaoGeeks(Tema.AMARELO, Tema.AMARELO, false);
         c.setLayout(new BoxLayout(c, BoxLayout.Y_AXIS));
-        c.setBorder(new EmptyBorder(12, 16, 16, 16));
-        if (destaque) {
-            Componentes.Faixa faixa = new Componentes.Faixa();
-            faixa.setMaximumSize(new Dimension(Integer.MAX_VALUE, 10));
-            faixa.setAlignmentX(CENTER_ALIGNMENT);
-            c.add(faixa);
-            c.add(Box.createVerticalStrut(8));
-        }
-        if (!destaque) {
-            c.add(Box.createVerticalStrut(18));
-        }
-        Componentes.BlocoIcone bloco = new Componentes.BlocoIcone(destaque ? Icone.Tipo.COROA : Icone.Tipo.ESTRELA,
-                destaque ? Tema.FUNDO : Tema.AMARELO, destaque ? Tema.AMARELO : Tema.FUNDO, 60, true);
+        c.setBorder(new EmptyBorder(14, 22, 20, 22));
+        Componentes.Faixa faixa = new Componentes.Faixa();
+        faixa.setMaximumSize(new Dimension(Integer.MAX_VALUE, 10));
+        faixa.setAlignmentX(CENTER_ALIGNMENT);
+        c.add(faixa);
+        c.add(Box.createVerticalStrut(14));
+        Componentes.BlocoIcone bloco = new Componentes.BlocoIcone(Icone.Tipo.COROA, Tema.FUNDO, Tema.AMARELO, 64, true);
         bloco.setAlignmentX(CENTER_ALIGNMENT);
-        bloco.setMaximumSize(new Dimension(60, 60));
+        bloco.setMaximumSize(new Dimension(64, 64));
         c.add(bloco);
         c.add(Box.createVerticalStrut(8));
-        c.add(centralizar(Componentes.rotulo("Plano " + plano.getNome(), Font.BOLD, 22, texto)));
-        c.add(centralizar(Componentes.rotulo(Formatador.moeda(plano.getMensalidade()) + "/mês",
-                Font.BOLD | Font.ITALIC, 26, texto)));
-        c.add(Box.createVerticalStrut(10));
+        c.add(centralizar(Componentes.rotulo(plano.getNome(), Font.BOLD | Font.ITALIC, 30, Tema.FUNDO)));
+        c.add(centralizar(Componentes.rotulo(Formatador.moeda(plano.getValor()), Font.BOLD | Font.ITALIC, 40, Tema.FUNDO)));
+        c.add(Box.createVerticalStrut(12));
         JPanel beneficios = Componentes.transparente(new GridLayout(0, 1, 0, 6));
         for (String b : plano.getBeneficios()) {
-            JLabel l = Componentes.rotulo(b, Font.PLAIN, 15, texto);
-            l.setIcon(new Icone(Icone.Tipo.CHECK, 16, texto));
+            JLabel l = Componentes.rotulo(b, Font.PLAIN, 16, Tema.FUNDO);
+            l.setIcon(new Icone(Icone.Tipo.CHECK, 16, Tema.FUNDO));
             l.setIconTextGap(8);
             beneficios.add(l);
         }
@@ -105,12 +91,9 @@ public class PainelClube extends PainelPagina {
         beneficios.setMaximumSize(new Dimension(Integer.MAX_VALUE, 90));
         c.add(beneficios);
         c.add(Box.createVerticalStrut(18));
-        BotaoGeeks assinar = new BotaoGeeks("Assinar", null, destaque ? BotaoGeeks.Estilo.ESCURO : BotaoGeeks.Estilo.CONTORNO);
-        assinar.setActionCommand(plano.name());
-        assinar.setAlignmentX(CENTER_ALIGNMENT);
-        assinar.setMaximumSize(new Dimension(Integer.MAX_VALUE, assinar.getPreferredSize().height));
-        botoesPlano.put(plano, assinar);
-        c.add(assinar);
+        btAssinar.setAlignmentX(CENTER_ALIGNMENT);
+        btAssinar.setMaximumSize(new Dimension(Integer.MAX_VALUE, btAssinar.getPreferredSize().height));
+        c.add(btAssinar);
         return c;
     }
 
@@ -121,26 +104,27 @@ public class PainelClube extends PainelPagina {
 
     public void limparSelecao() {
         areaCliente.removeAll();
-        areaCliente.add(Componentes.rotulo("<html>Busque um cliente já cadastrado para ver ou alterar a assinatura.</html>",
+        areaCliente.add(Componentes.rotulo("<html>Busque um cliente já cadastrado para assinar ou cancelar o plano.</html>",
                 Font.PLAIN, 16, Tema.CINZA), BorderLayout.NORTH);
-        atualizarPlanos(null);
+        atualizarPlano(null);
         refrescar();
     }
 
     public void mostrarCliente(Cliente c) {
         areaCliente.removeAll();
+        boolean assinante = c.getPlano() != Plano.NENHUM;
         JPanel info = Componentes.transparente(new BorderLayout(14, 0));
         info.add(new Componentes.BlocoIcone(Icone.Tipo.USUARIO_MAIS, Tema.AMARELO, Tema.FUNDO, 60, true), BorderLayout.WEST);
         JPanel textos = Componentes.transparente(new GridLayout(3, 1, 0, 2));
         textos.add(Componentes.rotulo(c.getNome(), Font.BOLD, 20, Tema.BRANCO));
         textos.add(Componentes.rotulo("CPF " + Formatador.cpf(c.getCpf()) + "  |  " + c.getTelefone(), Font.PLAIN, 14, Tema.CINZA));
         JPanel linhaChip = Componentes.transparente(new FlowLayout(FlowLayout.LEFT, 0, 2));
-        linhaChip.add(new Componentes.Chip(c.getPlano() == Plano.NENHUM ? "Sem plano" : "Plano " + c.getPlano().getNome(),
-                c.getPlano() == Plano.NENHUM ? Tema.CINZA : Tema.AMARELO, Icone.Tipo.COROA));
+        linhaChip.add(new Componentes.Chip(assinante ? "Assinante Clube Geeks" : "Sem plano",
+                assinante ? Tema.AMARELO : Tema.CINZA, Icone.Tipo.COROA));
         textos.add(linhaChip);
         info.add(textos, BorderLayout.CENTER);
         areaCliente.add(info, BorderLayout.NORTH);
-        atualizarPlanos(c);
+        atualizarPlano(c);
         refrescar();
     }
 
@@ -156,17 +140,15 @@ public class PainelClube extends PainelPagina {
         linha.add(novo);
         p.add(linha);
         areaCliente.add(p, BorderLayout.NORTH);
-        atualizarPlanos(null);
+        atualizarPlano(null);
         refrescar();
     }
 
-    private void atualizarPlanos(Cliente c) {
-        for (Map.Entry<Plano, BotaoGeeks> e : botoesPlano.entrySet()) {
-            boolean atual = c != null && c.getPlano() == e.getKey();
-            e.getValue().setText(atual ? "Plano atual" : "Assinar");
-            e.getValue().setEnabled(c != null && !atual);
-        }
-        btGerenciar.setEnabled(c != null && c.getPlano() != Plano.NENHUM);
+    private void atualizarPlano(Cliente c) {
+        boolean assinante = c != null && c.getPlano() != Plano.NENHUM;
+        btAssinar.setText(assinante ? "Plano ativo" : "Assinar");
+        btAssinar.setEnabled(c != null && !assinante);
+        btCancelar.setEnabled(assinante);
     }
 
     private void refrescar() {
@@ -183,13 +165,13 @@ public class PainelClube extends PainelPagina {
         campoBusca.addActionListener(l);
     }
 
-    /** O actionCommand do evento é o nome do Plano (BASICO ou PREMIUM). */
+    /** O actionCommand do evento é o nome do Plano (CLUBE). */
     public void addListenerAssinar(ActionListener l) {
-        botoesPlano.values().forEach(b -> b.addActionListener(l));
+        btAssinar.addActionListener(l);
     }
 
-    public void addListenerGerenciar(ActionListener l) {
-        btGerenciar.addActionListener(l);
+    public void addListenerCancelar(ActionListener l) {
+        btCancelar.addActionListener(l);
     }
 
     public void addListenerNovoCliente(ActionListener l) {

@@ -41,7 +41,7 @@ public abstract class PainelPagina extends JPanel {
         scroll.getViewport().setOpaque(false);
         scroll.getViewport().setScrollMode(JViewport.SIMPLE_SCROLL_MODE);
         scroll.getVerticalScrollBar().setUnitIncrement(18);
-        scroll.getVerticalScrollBar().setPreferredSize(new Dimension(10, 0));
+        ScrollGeeks.aplicar(scroll.getVerticalScrollBar());
         return scroll;
     }
 
@@ -53,7 +53,7 @@ public abstract class PainelPagina extends JPanel {
         g.setColor(Tema.FUNDO);
         g.fillRect(0, 0, w, h);
         g.setColor(Tema.AMARELO);
-        g.fillOval(w - 180, h - 190, 280, 280);
+        g.fillOval(w - 150, h - 160, 260, 260);
         g.dispose();
     }
 }

@@ -8,9 +8,14 @@ import java.awt.Font;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+import java.awt.geom.RoundRectangle2D;
 
 /** Item do menu lateral: vira uma pílula amarela quando selecionado. */
 public class BotaoNavegacao extends JToggleButton {
+    private final EfeitoClique efeito = new EfeitoClique(this);
+
     public BotaoNavegacao(String texto, Icone.Tipo icone) {
         super(texto);
         setIcon(new Icone(icone, 22));
@@ -23,6 +28,13 @@ public class BotaoNavegacao extends JToggleButton {
         setFont(Tema.fonte(Font.BOLD, 17));
         setBorder(new EmptyBorder(12, 16, 12, 16));
         setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        addMouseListener(new MouseAdapter() {
+            @Override
+            public void mousePressed(MouseEvent e) {
+                boolean selecionado = isSelected();
+                efeito.iniciar(e.getPoint(), selecionado ? Tema.BRANCO : Tema.AMARELO, selecionado ? Tema.FUNDO : Tema.AMARELO);
+            }
+        });
     }
 
     @Override
@@ -38,6 +50,7 @@ public class BotaoNavegacao extends JToggleButton {
             g.setColor(Tema.AMARELO);
             g.fillRoundRect(0, 0, getWidth(), getHeight(), 16, 16);
         }
+        efeito.pintar(g, new RoundRectangle2D.Double(0, 0, getWidth(), getHeight(), 16, 16));
         g.dispose();
         super.paintComponent(g0);
     }

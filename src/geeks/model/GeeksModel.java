@@ -212,7 +212,7 @@ public class GeeksModel {
         Cliente wby = new Cliente("Wbyrathan", 19, "(75) 99999-0003", "39053344705", "");
         Cliente matheus = new Cliente("Matheus Barbosa", 20, "(75) 99999-0004", "16899535009", "");
         Cliente nicolas = new Cliente("Nicolas Aragão", 16, "(75) 99999-0005", "11122233396", "Fernanda Aragão");
-        gabriel.setPlano(Plano.PREMIUM);
+        gabriel.setPlano(Plano.CLUBE);
         clientes.addAll(List.of(gabriel, mario, wby, matheus, nicolas));
 
         LocalDateTime agora = LocalDateTime.now();
