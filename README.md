@@ -11,4 +11,5 @@ Estrutura (marque a pasta `src` como *Sources Root* no IntelliJ):
         controller/           GeeksController (liga View e Model)
 
 Java 11+ (testado no JDK 21). Os dados atuais são de exemplo e ficam em memória (GeeksModel.carregarDadosDeExemplo).
+Clube Geeks: plano único de R$ 180,00 (enum Plano). Botões têm animação de clique (EfeitoClique). Janelas de nova sessão, reserva e horário seguem o tema (FormularioGeeks e Form*).
 Fonte opcional: instale "Barlow" para ficar idêntico ao design; sem ela o sistema usa Segoe UI/SansSerif.

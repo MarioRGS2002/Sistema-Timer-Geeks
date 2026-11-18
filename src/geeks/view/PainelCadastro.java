@@ -18,7 +18,7 @@ public class PainelCadastro extends PainelPagina {
     private final CampoGeeks campoTelefone = new CampoGeeks("(00) 00000-0000");
     private final CampoGeeks campoCpf = new CampoGeeks("000.000.000-00");
     private final CampoGeeks campoResponsavel = new CampoGeeks("Nome do responsável");
-    private final JCheckBox chkPlano = new JCheckBox("Escolher um plano depois de salvar");
+    private final JCheckBox chkPlano = new JCheckBox("Assinar o Clube Geeks depois de salvar");
     private final BotaoGeeks btSalvar = new BotaoGeeks("Salvar cadastro", Icone.Tipo.CHECK, BotaoGeeks.Estilo.PREENCHIDO);
     private final BotaoGeeks btLimpar = new BotaoGeeks("Limpar campos", null, BotaoGeeks.Estilo.CONTORNO);
 

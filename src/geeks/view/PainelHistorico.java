@@ -21,6 +21,9 @@ import java.awt.Graphics2D;
 import java.awt.GridLayout;
 import java.awt.RenderingHints;
 import java.awt.event.ActionListener;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+import java.awt.geom.RoundRectangle2D;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
@@ -132,6 +135,8 @@ public class PainelHistorico extends PainelPagina {
     }
 
     private static class BotaoFiltro extends JToggleButton {
+        private final EfeitoClique efeito = new EfeitoClique(this);
+
         BotaoFiltro(String texto) {
             super(texto);
             setContentAreaFilled(false);
@@ -141,6 +146,12 @@ public class PainelHistorico extends PainelPagina {
             setFont(Tema.fonte(Font.BOLD, 14));
             setBorder(new EmptyBorder(7, 16, 7, 16));
             setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+            addMouseListener(new MouseAdapter() {
+                @Override
+                public void mousePressed(MouseEvent e) {
+                    efeito.iniciar(e.getPoint(), isSelected() ? Tema.BRANCO : Tema.AMARELO, isSelected() ? Tema.FUNDO : Tema.AMARELO);
+                }
+            });
         }
 
         @Override
@@ -160,6 +171,7 @@ public class PainelHistorico extends PainelPagina {
                 g.setStroke(new java.awt.BasicStroke(2f));
                 g.drawRoundRect(1, 1, getWidth() - 3, getHeight() - 3, getHeight(), getHeight());
             }
+            efeito.pintar(g, new RoundRectangle2D.Double(0, 0, getWidth(), getHeight(), getHeight(), getHeight()));
             g.dispose();
             super.paintComponent(g0);
         }

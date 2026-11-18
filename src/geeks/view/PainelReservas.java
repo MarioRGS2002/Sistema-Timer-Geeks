@@ -18,6 +18,9 @@ import java.awt.Graphics2D;
 import java.awt.GridLayout;
 import java.awt.RenderingHints;
 import java.awt.event.ActionListener;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+import java.awt.geom.RoundRectangle2D;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.List;
@@ -140,6 +143,7 @@ public class PainelReservas extends PainelPagina {
         private boolean doMes;
         private boolean selecionado;
         private boolean temReserva;
+        private final EfeitoClique efeito = new EfeitoClique(this);
 
         BotaoDia() {
             setContentAreaFilled(false);
@@ -149,6 +153,12 @@ public class PainelReservas extends PainelPagina {
             setFont(Tema.fonte(Font.BOLD, 16));
             setPreferredSize(new Dimension(44, 40));
             setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+            addMouseListener(new MouseAdapter() {
+                @Override
+                public void mousePressed(MouseEvent e) {
+                    efeito.iniciar(e.getPoint(), selecionado ? Tema.BRANCO : Tema.AMARELO, selecionado ? Tema.FUNDO : Tema.AMARELO);
+                }
+            });
         }
 
         void configurar(LocalDate data, boolean doMes, boolean selecionado, boolean temReserva) {
@@ -179,6 +189,7 @@ public class PainelReservas extends PainelPagina {
                 g.setColor(selecionado ? Tema.FUNDO : Tema.AMARELO);
                 g.fillOval(w / 2 - 3, h - 12, 6, 6);
             }
+            efeito.pintar(g, new RoundRectangle2D.Double(0, 0, w, h, 14, 14));
             g.dispose();
         }
     }

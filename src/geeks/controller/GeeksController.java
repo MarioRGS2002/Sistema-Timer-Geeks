@@ -17,7 +17,6 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.YearMonth;
-import java.util.ArrayList;
 import java.util.List;
 
 /** Conecta a View (telas) às regras de negócio do Model. */
@@ -92,7 +91,7 @@ public class GeeksController {
     private void ligarClube() {
         view.getPainelClube().addListenerBuscar(e -> buscarClienteDoClube());
         view.getPainelClube().addListenerAssinar(e -> assinarPlano(Plano.valueOf(e.getActionCommand())));
-        view.getPainelClube().addListenerGerenciar(e -> gerenciarAssinatura());
+        view.getPainelClube().addListenerCancelar(e -> cancelarAssinatura());
         view.getPainelClube().addListenerNovoCliente(e -> view.mostrarTela(JanelaPrincipal.CADASTROS));
     }
 
@@ -138,7 +137,7 @@ public class GeeksController {
             Dialogos.info(view, "Todos os dispositivos estão em uso no momento.");
             return;
         }
-        Object[] r = Dialogos.pedirNovaSessao(view, model.getClientes(), livres);
+        Object[] r = Dialogos.pedirNovaSessao(view, model.getClientes(), model.getDispositivos(), model::dispositivoOcupado);
         if (r == null) {
             return;
         }
@@ -236,36 +235,22 @@ public class GeeksController {
         if (clienteDoClube == null) {
             return;
         }
-        String msg = "Assinar o plano " + plano.getNome() + " (" + Formatador.moeda(plano.getMensalidade())
-                + "/mês) para " + clienteDoClube.getNome() + "?";
+        String msg = "Assinar o " + plano.getNome() + " (" + Formatador.moeda(plano.getValor())
+                + ") para " + clienteDoClube.getNome() + "?";
         if (Dialogos.confirmar(view, msg)) {
             model.assinarPlano(clienteDoClube, plano);
             view.getPainelClube().mostrarCliente(clienteDoClube);
         }
     }
 
-    private void gerenciarAssinatura() {
+    private void cancelarAssinatura() {
         if (clienteDoClube == null || clienteDoClube.getPlano() == Plano.NENHUM) {
             return;
         }
-        List<String> opcoes = List.of("Alterar plano", "Cancelar assinatura");
-        String escolha = Dialogos.escolher(view, "Gerenciar assinatura", "O que deseja fazer?", opcoes);
-        if (escolha == null) {
-            return;
+        if (Dialogos.confirmar(view, "Cancelar a assinatura de " + clienteDoClube.getNome() + "?")) {
+            model.assinarPlano(clienteDoClube, Plano.NENHUM);
+            view.getPainelClube().mostrarCliente(clienteDoClube);
         }
-        if (escolha.equals("Cancelar assinatura")) {
-            if (Dialogos.confirmar(view, "Cancelar a assinatura de " + clienteDoClube.getNome() + "?")) {
-                model.assinarPlano(clienteDoClube, Plano.NENHUM);
-            }
-        } else {
-            List<Plano> outros = new ArrayList<>(List.of(Plano.BASICO, Plano.PREMIUM));
-            outros.remove(clienteDoClube.getPlano());
-            Plano novo = Dialogos.escolher(view, "Alterar plano", "Escolha o novo plano:", outros);
-            if (novo != null) {
-                model.assinarPlano(clienteDoClube, novo);
-            }
-        }
-        view.getPainelClube().mostrarCliente(clienteDoClube);
     }
 
     // ---------- Cadastro ----------
