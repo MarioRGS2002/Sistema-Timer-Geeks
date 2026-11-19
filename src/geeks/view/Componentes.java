@@ -54,6 +54,9 @@ public final class Componentes {
         private final Color corIcone;
         private final int tamanho;
         private final boolean circular;
+        private int margem;
+        private double escala = 1;
+        private double rotacao = 0;
 
         public BlocoIcone(Icone.Tipo tipo, Color fundo, Color corIcone, int tamanho, boolean circular) {
             this.tipo = tipo;
@@ -67,6 +70,35 @@ public final class Componentes {
             this(Tema.iconeDe(dispositivo), Tema.corDe(dispositivo), Tema.FUNDO, tamanho, false);
         }
 
+        /** Espaço extra em volta, para as animações (pop, agitar) não serem cortadas. */
+        public BlocoIcone comMargem(int margem) {
+            this.margem = margem;
+            return this;
+        }
+
+        /** O bloco "salta" para dentro da tela com um leve exagero. */
+        public void pop(int atrasoMs) {
+            escala = 0;
+            Animacao.executar(520, atrasoMs, p -> {
+                escala = Animacao.elastico(p);
+                repaint();
+            }, () -> {
+                escala = 1;
+                repaint();
+            });
+        }
+
+        /** Balança de um lado para o outro e assenta (usado em avisos). */
+        public void agitar(int atrasoMs) {
+            Animacao.executar(560, atrasoMs, p -> {
+                rotacao = Math.sin(p * Math.PI * 5) * (1 - p) * 0.28;
+                repaint();
+            }, () -> {
+                rotacao = 0;
+                repaint();
+            });
+        }
+
         @Override
         public Dimension getMinimumSize() {
             return getPreferredSize();
@@ -74,12 +106,16 @@ public final class Componentes {
 
         @Override
         public Dimension getPreferredSize() {
-            return new Dimension(tamanho, tamanho);
+            return new Dimension(tamanho + 2 * margem, tamanho + 2 * margem);
         }
 
         @Override
         protected void paintComponent(Graphics g) {
             Graphics2D g2 = suave(g);
+            g2.translate(getWidth() / 2.0, getHeight() / 2.0);
+            g2.scale(escala, escala);
+            g2.rotate(rotacao);
+            g2.translate(-tamanho / 2.0, -tamanho / 2.0);
             g2.setColor(fundo);
             int arco = circular ? tamanho : (int) (tamanho * 0.32);
             g2.fillRoundRect(0, 0, tamanho, tamanho, arco, arco);
@@ -130,12 +166,34 @@ public final class Componentes {
         }
     }
 
-    /** Barra de progresso fina em degradê amarelo. */
+    /** Barra de progresso fina em degradê amarelo (pode "crescer" ao aparecer). */
     public static class Barra extends JComponent {
-        private final double percentual; // 0..1
+        private final double alvo; // 0..1
+        private final int atrasoMs;
+        private double atual;
+        private boolean iniciou;
 
         public Barra(double percentual) {
-            this.percentual = Math.max(0.04, Math.min(1, percentual));
+            this(percentual, -1);
+        }
+
+        /** atrasoMs >= 0 faz a barra crescer do zero até o valor ao aparecer na tela. */
+        public Barra(double percentual, int atrasoMs) {
+            this.alvo = Math.max(0.04, Math.min(1, percentual));
+            this.atrasoMs = atrasoMs;
+            this.atual = atrasoMs < 0 ? alvo : 0;
+        }
+
+        @Override
+        public void addNotify() {
+            super.addNotify();
+            if (atrasoMs >= 0 && !iniciou) {
+                iniciou = true;
+                Animacao.executar(700, atrasoMs, p -> {
+                    atual = alvo * Animacao.suave(p);
+                    repaint();
+                }, null);
+            }
         }
 
         @Override
@@ -153,8 +211,11 @@ public final class Componentes {
             Graphics2D g2 = suave(g);
             g2.setColor(Tema.BORDA);
             g2.fillRoundRect(0, 0, getWidth(), 8, 8, 8);
-            g2.setPaint(new GradientPaint(0, 0, Tema.AMARELO, getWidth(), 0, new Color(0xFFB800)));
-            g2.fillRoundRect(0, 0, (int) (getWidth() * percentual), 8, 8, 8);
+            int largura = (int) (getWidth() * atual);
+            if (largura > 0) {
+                g2.setPaint(new GradientPaint(0, 0, Tema.AMARELO, getWidth(), 0, new Color(0xFFB800)));
+                g2.fillRoundRect(0, 0, Math.max(8, largura), 8, 8, 8);
+            }
             g2.dispose();
         }
     }
@@ -188,6 +249,19 @@ public final class Componentes {
 
     /** Indicador pequeno com ícone e texto (ex.: "5 ativas"). */
     public static class Pilula extends JLabel {
+        private float brilho;
+
+        /** Contorno amarelo que acende e apaga: chama a atenção para uma mudança de valor. */
+        public void piscar() {
+            Animacao.executar(800, 0, p -> {
+                brilho = (float) (1 - p);
+                repaint();
+            }, () -> {
+                brilho = 0;
+                repaint();
+            });
+        }
+
         public Pilula(Icone.Tipo tipo, String texto) {
             super(texto, new Icone(tipo, 18, Tema.AMARELO), SwingConstants.LEFT);
             setFont(Tema.fonte(Font.BOLD, 15));
@@ -204,6 +278,11 @@ public final class Componentes {
             g2.fillRoundRect(0, 0, getWidth(), getHeight(), getHeight(), getHeight());
             g2.setColor(new Color(0x333333));
             g2.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, getHeight(), getHeight());
+            if (brilho > 0) {
+                g2.setColor(new Color(255, 214, 10, (int) (255 * brilho)));
+                g2.setStroke(new java.awt.BasicStroke(2f));
+                g2.drawRoundRect(1, 1, getWidth() - 3, getHeight() - 3, getHeight(), getHeight());
+            }
             g2.dispose();
             super.paintComponent(g);
         }

@@ -63,6 +63,21 @@ public class BotaoGeeks extends JButton {
         });
     }
 
+    /** Ao pressionar, o botão "afunda" um pouco (feedback tátil). */
+    @Override
+    public void paint(Graphics g0) {
+        if (getModel().isPressed() && isEnabled()) {
+            Graphics2D g = (Graphics2D) g0.create();
+            g.translate(getWidth() / 2.0, getHeight() / 2.0);
+            g.scale(0.965, 0.92);
+            g.translate(-getWidth() / 2.0, -getHeight() / 2.0);
+            super.paint(g);
+            g.dispose();
+        } else {
+            super.paint(g0);
+        }
+    }
+
     /** Se a animação de clique está rodando, a ação é disparada logo depois dela começar. */
     @Override
     protected void fireActionPerformed(ActionEvent e) {

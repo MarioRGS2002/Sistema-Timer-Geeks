@@ -143,6 +143,7 @@ public class PainelReservas extends PainelPagina {
         private boolean doMes;
         private boolean selecionado;
         private boolean temReserva;
+        private boolean passando;
         private final EfeitoClique efeito = new EfeitoClique(this);
 
         BotaoDia() {
@@ -157,6 +158,18 @@ public class PainelReservas extends PainelPagina {
                 @Override
                 public void mousePressed(MouseEvent e) {
                     efeito.iniciar(e.getPoint(), selecionado ? Tema.BRANCO : Tema.AMARELO, selecionado ? Tema.FUNDO : Tema.AMARELO);
+                }
+
+                @Override
+                public void mouseEntered(MouseEvent e) {
+                    passando = true;
+                    repaint();
+                }
+
+                @Override
+                public void mouseExited(MouseEvent e) {
+                    passando = false;
+                    repaint();
                 }
             });
         }
@@ -178,6 +191,10 @@ public class PainelReservas extends PainelPagina {
             int w = getWidth(), h = getHeight();
             if (selecionado) {
                 g.setColor(Tema.AMARELO);
+                g.fillRoundRect(0, 0, w, h, 14, 14);
+            }
+            if (passando && !selecionado) {
+                g.setColor(new Color(255, 214, 10, 40));
                 g.fillRoundRect(0, 0, w, h, 14, 14);
             }
             g.setColor(selecionado ? Tema.FUNDO : doMes ? Tema.BRANCO : new Color(0x6F6F6F));

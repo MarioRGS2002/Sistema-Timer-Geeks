@@ -154,12 +154,13 @@ public class GeeksController {
         if (sessao == null) {
             return;
         }
-        String resumo = "Encerrar a sessão de " + sessao.getCliente().getNome() + " em " + sessao.getDispositivo().getNome()
-                + "?\nTempo: " + Formatador.duracao(sessao.getDuracao()) + "\nValor: " + Formatador.moeda(sessao.getValor());
-        if (Dialogos.confirmar(view, resumo)) {
-            model.encerrarSessao(id);
-            atualizarSessoes();
-            atualizarHistorico();
+        if (Dialogos.confirmarEncerramento(view, sessao)) {
+            // o cartão some com animação e só então a sessão é encerrada e as telas atualizadas
+            view.getPainelSessoes().animarSaida(id, () -> {
+                model.encerrarSessao(id);
+                atualizarSessoes();
+                atualizarHistorico();
+            });
         }
     }
 
@@ -183,15 +184,20 @@ public class GeeksController {
     }
 
     private void cancelarReserva() {
-        Reserva r = escolherReservaDoDia("Gerenciar reservas", "Selecione a reserva que deseja cancelar:");
-        if (r != null && Dialogos.confirmar(view, "Cancelar a reserva \"" + r + "\"?")) {
+        Reserva r = escolherReservaDoDia("Cancelar reserva", "Selecione a reserva que deseja cancelar:", "Continuar");
+        if (r == null) {
+            return;
+        }
+        String msg = "Cancelar a reserva de " + r.getCliente().getNome() + " em " + r.getDispositivo().getNome()
+                + " às " + r.getDataHora().toLocalTime() + "?";
+        if (Dialogos.confirmar(view, "Cancelar reserva", msg, "Cancelar reserva", true)) {
             model.cancelarReserva(r);
             atualizarReservas();
         }
     }
 
     private void alterarReserva() {
-        Reserva r = escolherReservaDoDia("Alterar reserva", "Selecione a reserva que deseja alterar:");
+        Reserva r = escolherReservaDoDia("Alterar reserva", "Selecione a reserva que deseja alterar:", "Continuar");
         if (r == null) {
             return;
         }
@@ -207,13 +213,13 @@ public class GeeksController {
         }
     }
 
-    private Reserva escolherReservaDoDia(String titulo, String mensagem) {
+    private Reserva escolherReservaDoDia(String titulo, String mensagem, String textoConfirmar) {
         List<Reserva> doDia = model.getReservasDoDia(diaSelecionado);
         if (doDia.isEmpty()) {
             Dialogos.info(view, "Não há reservas em " + Formatador.dataExtenso(diaSelecionado) + ".");
             return null;
         }
-        return Dialogos.escolher(view, titulo, mensagem, doDia);
+        return Dialogos.escolherReserva(view, titulo, mensagem, textoConfirmar, doDia);
     }
 
     // ---------- Clube Geeks ----------
@@ -237,9 +243,10 @@ public class GeeksController {
         }
         String msg = "Assinar o " + plano.getNome() + " (" + Formatador.moeda(plano.getValor())
                 + ") para " + clienteDoClube.getNome() + "?";
-        if (Dialogos.confirmar(view, msg)) {
+        if (Dialogos.confirmar(view, "Assinar clube", msg, "Assinar", false)) {
             model.assinarPlano(clienteDoClube, plano);
             view.getPainelClube().mostrarCliente(clienteDoClube);
+            Dialogos.sucesso(view, clienteDoClube.getNome() + " agora faz parte do Clube Geeks!");
         }
     }
 
@@ -247,7 +254,8 @@ public class GeeksController {
         if (clienteDoClube == null || clienteDoClube.getPlano() == Plano.NENHUM) {
             return;
         }
-        if (Dialogos.confirmar(view, "Cancelar a assinatura de " + clienteDoClube.getNome() + "?")) {
+        if (Dialogos.confirmar(view, "Cancelar assinatura", "Cancelar a assinatura de " + clienteDoClube.getNome() + "?",
+                "Cancelar assinatura", true)) {
             model.assinarPlano(clienteDoClube, Plano.NENHUM);
             view.getPainelClube().mostrarCliente(clienteDoClube);
         }
@@ -262,7 +270,7 @@ public class GeeksController {
                     view.getPainelCadastro().getResponsavel());
             boolean escolherPlano = view.getPainelCadastro().isEscolherPlano();
             view.getPainelCadastro().limparCampos();
-            Dialogos.info(view, "Cliente " + novo.getNome() + " cadastrado com sucesso!");
+            Dialogos.sucesso(view, "Cliente " + novo.getNome() + " cadastrado com sucesso!");
             if (escolherPlano) {
                 clienteDoClube = novo;
                 view.getPainelClube().mostrarCliente(novo);

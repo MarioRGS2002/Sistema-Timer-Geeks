@@ -46,10 +46,6 @@ public class BotaoNavegacao extends JToggleButton {
     protected void paintComponent(Graphics g0) {
         Graphics2D g = (Graphics2D) g0.create();
         g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-        if (isSelected()) {
-            g.setColor(Tema.AMARELO);
-            g.fillRoundRect(0, 0, getWidth(), getHeight(), 16, 16);
-        }
         efeito.pintar(g, new RoundRectangle2D.Double(0, 0, getWidth(), getHeight(), 16, 16));
         g.dispose();
         super.paintComponent(g0);

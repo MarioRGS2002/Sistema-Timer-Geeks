@@ -105,6 +105,7 @@ public class PainelHistorico extends PainelPagina {
             dados.addActionListener(listenerDados);
         }
         linha.add(dados, BorderLayout.EAST);
+        linha.ativarHover();
         return linha;
     }
 

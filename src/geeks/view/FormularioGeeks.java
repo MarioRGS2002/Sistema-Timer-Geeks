@@ -5,6 +5,7 @@ import javax.swing.JComponent;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.border.EmptyBorder;
+import java.awt.AlphaComposite;
 import java.awt.BorderLayout;
 import java.awt.FlowLayout;
 import java.awt.Font;
@@ -23,7 +24,13 @@ public abstract class FormularioGeeks extends JPanel {
     private Runnable aoConfirmar = () -> { };
     private Runnable aoCancelar = () -> { };
 
+    private float entrada = 1f;
+
     protected FormularioGeeks(String titulo, String textoConfirmar, Icone.Tipo icone) {
+        this(titulo, textoConfirmar, icone, true);
+    }
+
+    protected FormularioGeeks(String titulo, String textoConfirmar, Icone.Tipo icone, boolean comCancelar) {
         super(new BorderLayout(0, 18));
         setBorder(new EmptyBorder(24, 28, 22, 28));
 
@@ -39,7 +46,9 @@ public abstract class FormularioGeeks extends JPanel {
         btConfirmar.addActionListener(e -> aoConfirmar.run());
         btCancelar.addActionListener(e -> aoCancelar.run());
         JPanel botoes = Componentes.transparente(new FlowLayout(FlowLayout.RIGHT, 10, 0));
-        botoes.add(btCancelar);
+        if (comCancelar) {
+            botoes.add(btCancelar);
+        }
         botoes.add(btConfirmar);
         JPanel rodape = Componentes.transparente(new BorderLayout(0, 12));
         rodape.add(resumo, BorderLayout.NORTH);
@@ -72,6 +81,31 @@ public abstract class FormularioGeeks extends JPanel {
         p.add(secao(titulo, icone), BorderLayout.NORTH);
         p.add(conteudo, BorderLayout.CENTER);
         return p;
+    }
+
+    /** Chamado quando a janela vai aparecer: o conteúdo sobe suavemente enquanto surge. */
+    public void animarEntrada() {
+        entrada = 0f;
+        Animacao.executar(300, 0, p -> {
+            entrada = (float) Animacao.suave(p);
+            repaint();
+        }, () -> {
+            entrada = 1f;
+            repaint();
+        });
+    }
+
+    @Override
+    protected void paintChildren(Graphics g0) {
+        if (entrada >= 0.999f) {
+            super.paintChildren(g0);
+            return;
+        }
+        Graphics2D g = (Graphics2D) g0.create();
+        g.setComposite(AlphaComposite.SrcOver.derive(entrada));
+        g.translate(0, (1 - entrada) * 18);
+        super.paintChildren(g);
+        g.dispose();
     }
 
     public void setAoConfirmar(Runnable r) {
