@@ -14,6 +14,8 @@ import java.awt.event.FocusEvent;
 public class CampoGeeks extends JTextField {
     private final String dica;
     private Icone.Tipo icone;
+    private float foco;
+    private javax.swing.Timer timerFoco;
 
     public CampoGeeks(String dica) {
         this.dica = dica;
@@ -25,14 +27,25 @@ public class CampoGeeks extends JTextField {
         addFocusListener(new FocusAdapter() {
             @Override
             public void focusGained(FocusEvent e) {
-                repaint();
+                animarFoco(1f);
             }
 
             @Override
             public void focusLost(FocusEvent e) {
-                repaint();
+                animarFoco(0f);
             }
         });
+    }
+
+    private void animarFoco(float alvo) {
+        if (timerFoco != null) {
+            timerFoco.stop();
+        }
+        final float de = foco;
+        timerFoco = Animacao.executar(170, 0, t -> {
+            foco = (float) (de + (alvo - de) * t);
+            repaint();
+        }, null);
     }
 
     public void setIconeEsquerda(Icone.Tipo icone) {
@@ -46,7 +59,12 @@ public class CampoGeeks extends JTextField {
         g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
         g.setColor(Tema.CAMPO);
         g.fillRoundRect(0, 0, getWidth(), getHeight(), 16, 16);
-        g.setColor(isFocusOwner() ? Tema.AMARELO : new Color(0x333333));
+        if (foco > 0) {
+            g.setColor(new Color(255, 214, 10, (int) (50 * foco)));
+            g.setStroke(new java.awt.BasicStroke(6f));
+            g.drawRoundRect(1, 1, getWidth() - 3, getHeight() - 3, 16, 16);
+        }
+        g.setColor(Tema.misturar(new Color(0x333333), Tema.AMARELO, foco));
         g.setStroke(new java.awt.BasicStroke(2f));
         g.drawRoundRect(1, 1, getWidth() - 3, getHeight() - 3, 16, 16);
         if (icone != null) {

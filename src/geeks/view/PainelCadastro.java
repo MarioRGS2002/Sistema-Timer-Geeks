@@ -1,6 +1,5 @@
 package geeks.view;
 
-import javax.swing.JCheckBox;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.border.EmptyBorder;
@@ -18,7 +17,7 @@ public class PainelCadastro extends PainelPagina {
     private final CampoGeeks campoTelefone = new CampoGeeks("(00) 00000-0000");
     private final CampoGeeks campoCpf = new CampoGeeks("000.000.000-00");
     private final CampoGeeks campoResponsavel = new CampoGeeks("Nome do responsável");
-    private final JCheckBox chkPlano = new JCheckBox("Assinar o Clube Geeks depois de salvar");
+    private final CaixaMarcacao chkPlano = new CaixaMarcacao("Assinar o Clube Geeks depois de salvar");
     private final BotaoGeeks btSalvar = new BotaoGeeks("Salvar cadastro", Icone.Tipo.CHECK, BotaoGeeks.Estilo.PREENCHIDO);
     private final BotaoGeeks btLimpar = new BotaoGeeks("Limpar campos", null, BotaoGeeks.Estilo.CONTORNO);
 
@@ -80,9 +79,6 @@ public class PainelCadastro extends PainelPagina {
         g.gridy = 3;
         c.add(Componentes.rotulo("Vantagens para clientes Geeks", Font.BOLD, 16, Tema.FUNDO), g);
         g.gridy = 4;
-        chkPlano.setOpaque(false);
-        chkPlano.setFont(Tema.fonte(Font.BOLD, 15));
-        chkPlano.setForeground(Tema.FUNDO);
         c.add(chkPlano, g);
         return c;
     }
