@@ -16,7 +16,9 @@ import java.awt.Font;
 import java.awt.HeadlessException;
 import java.awt.Image;
 import java.awt.event.ActionListener;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /** Janela principal: menu lateral com o logo da Geeks e as telas do sistema. */
@@ -31,6 +33,8 @@ public class JanelaPrincipal extends JFrame {
     private final JPanel conteudo = new JPanel(cartas);
     private final Map<String, BotaoNavegacao> botoes = new LinkedHashMap<>();
     private final ButtonGroup grupo = new ButtonGroup();
+    private final Map<String, PainelPagina> paineis = new HashMap<>();
+    private MenuLateral menu;
 
     private final PainelSessoes painelSessoes = new PainelSessoes();
     private final PainelReservas painelReservas = new PainelReservas();
@@ -43,16 +47,16 @@ public class JanelaPrincipal extends JFrame {
         setLayout(new BorderLayout());
         add(criarMenuLateral(), BorderLayout.WEST);
 
-        conteudo.add(painelSessoes, SESSOES);
-        conteudo.add(painelReservas, RESERVAS);
-        conteudo.add(painelHistorico, HISTORICO);
-        conteudo.add(painelClube, CLUBE);
-        conteudo.add(painelCadastro, CADASTROS);
+        registrar(SESSOES, painelSessoes);
+        registrar(RESERVAS, painelReservas);
+        registrar(HISTORICO, painelHistorico);
+        registrar(CLUBE, painelClube);
+        registrar(CADASTROS, painelCadastro);
         add(conteudo, BorderLayout.CENTER);
 
-        Image icone = Tema.imagemOriginal("/img/g_geeks_logo.png");
-        if (icone != null) {
-            setIconImage(icone);
+        List<Image> icones = Tema.iconesDaJanela();
+        if (!icones.isEmpty()) {
+            setIconImages(icones);
         }
         setSize(1280, 720);
         setMinimumSize(new Dimension(1100, 650));
@@ -60,8 +64,13 @@ public class JanelaPrincipal extends JFrame {
         setLocationRelativeTo(null);
     }
 
+    private void registrar(String chave, PainelPagina painel) {
+        conteudo.add(painel, chave);
+        paineis.put(chave, painel);
+    }
+
     private JPanel criarMenuLateral() {
-        JPanel menu = new JPanel();
+        menu = new MenuLateral();
         menu.setLayout(new BoxLayout(menu, BoxLayout.Y_AXIS));
         menu.setBackground(Tema.LATERAL);
         menu.setPreferredSize(new Dimension(236, 0));
@@ -98,6 +107,8 @@ public class JanelaPrincipal extends JFrame {
     public void mostrarTela(String chave) {
         cartas.show(conteudo, chave);
         botoes.get(chave).setSelected(true);
+        menu.mover(botoes.get(chave));
+        paineis.get(chave).animarEntrada();
     }
 
     /** O actionCommand do evento é a chave da tela (SESSOES, RESERVAS, ...). */

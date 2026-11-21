@@ -3,8 +3,8 @@ package geeks.view;
 import geeks.model.Sessao;
 
 import javax.swing.JComponent;
-import javax.swing.JLabel;
 import javax.swing.JPanel;
+import javax.swing.Timer;
 import javax.swing.border.EmptyBorder;
 import java.awt.BorderLayout;
 import java.awt.FlowLayout;
@@ -12,7 +12,13 @@ import java.awt.Font;
 import java.awt.GridLayout;
 import java.awt.event.ActionListener;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 public class PainelSessoes extends PainelPagina {
     private static final double REFERENCIA_BARRA_MIN = 180; // só efeito visual: barra cheia = 3h
@@ -20,6 +26,12 @@ public class PainelSessoes extends PainelPagina {
     private final JPanel grade = Componentes.transparente(new GridLayout(0, 3, 20, 20));
     private final Componentes.Pilula pilulaAtivas = new Componentes.Pilula(Icone.Tipo.CONTROLE, "0 ativas");
     private final Componentes.Pilula pilulaFaturamento = new Componentes.Pilula(Icone.Tipo.MOEDA, "R$ 0,00 hoje");
+    private final Set<String> idsAnimados = new HashSet<>();
+    private final Map<String, CartaoGeeks> cartoesPorId = new HashMap<>();
+    private List<Sessao> ultimas = new ArrayList<>();
+    private BigDecimal valorExibido;
+    private int ativasAnterior = -1;
+    private Timer timerValor;
     private ActionListener listenerEncerrar;
     private ActionListener listenerNova;
 
@@ -35,9 +47,31 @@ public class PainelSessoes extends PainelPagina {
     }
 
     public void atualizarSessoes(List<Sessao> sessoes) {
+        this.ultimas = new ArrayList<>(sessoes);
+        reconstruir();
+    }
+
+    /** Ao entrar na tela, os cartões surgem em sequência e as barras crescem de novo. */
+    @Override
+    public void animarEntrada() {
+        super.animarEntrada();
+        idsAnimados.clear();
+        reconstruir();
+    }
+
+    private void reconstruir() {
         grade.removeAll();
-        for (Sessao s : sessoes) {
-            grade.add(criarCartao(s));
+        cartoesPorId.clear();
+        int novos = 0;
+        for (Sessao s : ultimas) {
+            boolean novo = idsAnimados.add(s.getId());
+            CartaoGeeks c = criarCartao(s, novo ? novos * 60 : -1);
+            if (novo) {
+                c.entrar(novos * 60);
+                novos++;
+            }
+            cartoesPorId.put(s.getId(), c);
+            grade.add(c);
         }
         grade.add(criarCartaoNova());
         grade.revalidate();
@@ -46,10 +80,42 @@ public class PainelSessoes extends PainelPagina {
 
     public void atualizarResumo(int ativas, BigDecimal faturamentoHoje) {
         pilulaAtivas.setText(ativas + (ativas == 1 ? " ativa" : " ativas"));
-        pilulaFaturamento.setText(Formatador.moeda(faturamentoHoje) + " hoje");
+        if (ativasAnterior >= 0 && ativasAnterior != ativas) {
+            pilulaAtivas.piscar();
+        }
+        ativasAnterior = ativas;
+
+        final BigDecimal de = valorExibido == null ? faturamentoHoje : valorExibido;
+        valorExibido = faturamentoHoje;
+        if (timerValor != null) {
+            timerValor.stop();
+        }
+        if (de.compareTo(faturamentoHoje) == 0) {
+            pilulaFaturamento.setText(Formatador.moeda(faturamentoHoje) + " hoje");
+            return;
+        }
+        if (faturamentoHoje.subtract(de).abs().compareTo(BigDecimal.ONE) >= 0) {
+            pilulaFaturamento.piscar();
+        }
+        // o valor "conta" até o novo total
+        timerValor = Animacao.executar(650, 0, p -> {
+            BigDecimal v = de.add(faturamentoHoje.subtract(de).multiply(BigDecimal.valueOf(Animacao.suave(p))))
+                    .setScale(2, RoundingMode.HALF_UP);
+            pilulaFaturamento.setText(Formatador.moeda(v) + " hoje");
+        }, () -> pilulaFaturamento.setText(Formatador.moeda(faturamentoHoje) + " hoje"));
     }
 
-    private JComponent criarCartao(Sessao s) {
+    /** O cartão da sessão encerrada some com animação e só depois a ação é executada. */
+    public void animarSaida(String idSessao, Runnable depois) {
+        CartaoGeeks c = cartoesPorId.get(idSessao);
+        if (c == null) {
+            depois.run();
+        } else {
+            c.sair(depois);
+        }
+    }
+
+    private CartaoGeeks criarCartao(Sessao s, int atrasoAnimacao) {
         CartaoGeeks cartao = new CartaoGeeks();
         cartao.setLayout(new BorderLayout(0, 10));
         cartao.setBorder(new EmptyBorder(16, 16, 16, 16));
@@ -65,7 +131,8 @@ public class PainelSessoes extends PainelPagina {
         topo.add(nomes, BorderLayout.CENTER);
 
         JPanel meio = Componentes.transparente(new GridLayout(2, 1, 0, 8));
-        meio.add(new Componentes.Barra(s.getDuracao().toMinutes() / REFERENCIA_BARRA_MIN));
+        meio.add(new Componentes.Barra(s.getDuracao().toMinutes() / REFERENCIA_BARRA_MIN,
+                atrasoAnimacao < 0 ? -1 : atrasoAnimacao + 150));
         JPanel valores = Componentes.transparente(new BorderLayout());
         valores.add(Componentes.rotuloIcone(Formatador.duracao(s.getDuracao()), Icone.Tipo.RELOGIO, Tema.CINZA, 15), BorderLayout.WEST);
         valores.add(Componentes.rotuloIcone(Formatador.moeda(s.getValor()), Icone.Tipo.MOEDA, Tema.AMARELO, 15), BorderLayout.EAST);
@@ -80,6 +147,7 @@ public class PainelSessoes extends PainelPagina {
         cartao.add(topo, BorderLayout.NORTH);
         cartao.add(meio, BorderLayout.CENTER);
         cartao.add(encerrar, BorderLayout.SOUTH);
+        cartao.ativarHover();
         return cartao;
     }
 
