@@ -18,7 +18,7 @@ import java.awt.geom.RoundRectangle2D;
 public class Icone implements Icon {
     public enum Tipo {
         MONITOR, CONTROLE, SWITCH, PEAO, CALENDARIO, RELOGIO, COROA, USUARIO_MAIS, RAIO,
-        MOEDA, ESTRELA, MAIS, LISTA, LAPIS, CHECK, LUPA, TROFEU, CUBO, ALERTA, INFO
+        MOEDA, ESTRELA, MAIS, LISTA, LAPIS, CHECK, LUPA, TROFEU, CUBO, ALERTA, INFO, CADEADO
     }
 
     private final Tipo tipo;
@@ -158,6 +158,13 @@ public class Icone implements Icon {
                 g.draw(new Ellipse2D.Double(3, 3, 18, 18));
                 linha(g, 12, 11, 12, 17);
                 g.fill(new Ellipse2D.Double(11.1, 6.8, 1.8, 1.8));
+                break;
+            case CADEADO:
+                g.draw(new RoundRectangle2D.Double(5, 11, 14, 10, 3, 3));
+                g.draw(new Arc2D.Double(8, 3, 8, 10, 0, 180, Arc2D.OPEN));
+                linha(g, 8, 8, 8, 11);
+                linha(g, 16, 8, 16, 11);
+                g.fill(new Ellipse2D.Double(11.2, 14.8, 1.6, 1.6));
                 break;
             default: // CUBO
                 poligono(g, 12, 3, 21, 8, 21, 16, 12, 21, 3, 16, 3, 8);

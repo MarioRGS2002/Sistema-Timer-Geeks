@@ -28,6 +28,7 @@ public class JanelaPrincipal extends JFrame {
     public static final String HISTORICO = "HISTORICO";
     public static final String CLUBE = "CLUBE";
     public static final String CADASTROS = "CADASTROS";
+    public static final String FATURAMENTO = "FATURAMENTO";
 
     private final CardLayout cartas = new CardLayout();
     private final JPanel conteudo = new JPanel(cartas);
@@ -35,6 +36,8 @@ public class JanelaPrincipal extends JFrame {
     private final ButtonGroup grupo = new ButtonGroup();
     private final Map<String, PainelPagina> paineis = new HashMap<>();
     private MenuLateral menu;
+    private final boolean gerente;
+    private PainelFaturamento painelFaturamento;
 
     private final PainelSessoes painelSessoes = new PainelSessoes();
     private final PainelReservas painelReservas = new PainelReservas();
@@ -43,6 +46,12 @@ public class JanelaPrincipal extends JFrame {
     private final PainelCadastro painelCadastro = new PainelCadastro();
 
     public JanelaPrincipal() throws HeadlessException {
+        this(false);
+    }
+
+    /** @param gerente true libera as telas exclusivas do gerente (Faturamento) */
+    public JanelaPrincipal(boolean gerente) throws HeadlessException {
+        this.gerente = gerente;
         setTitle("Geeks - Sistema de Gestão");
         setLayout(new BorderLayout());
         add(criarMenuLateral(), BorderLayout.WEST);
@@ -52,6 +61,10 @@ public class JanelaPrincipal extends JFrame {
         registrar(HISTORICO, painelHistorico);
         registrar(CLUBE, painelClube);
         registrar(CADASTROS, painelCadastro);
+        if (gerente) {
+            painelFaturamento = new PainelFaturamento();
+            registrar(FATURAMENTO, painelFaturamento);
+        }
         add(conteudo, BorderLayout.CENTER);
 
         List<Image> icones = Tema.iconesDaJanela();
@@ -89,6 +102,9 @@ public class JanelaPrincipal extends JFrame {
         adicionarItem(menu, HISTORICO, "Histórico", Icone.Tipo.RELOGIO);
         adicionarItem(menu, CLUBE, "Clube Geeks", Icone.Tipo.COROA);
         adicionarItem(menu, CADASTROS, "Cadastros", Icone.Tipo.USUARIO_MAIS);
+        if (gerente) {
+            adicionarItem(menu, FATURAMENTO, "Faturamento", Icone.Tipo.MOEDA);
+        }
         menu.add(Box.createVerticalGlue());
         return menu;
     }
@@ -105,6 +121,9 @@ public class JanelaPrincipal extends JFrame {
     }
 
     public void mostrarTela(String chave) {
+        if (!paineis.containsKey(chave)) {
+            return; // tela inexistente ou sem permissão (ex.: Faturamento para quem não é gerente)
+        }
         cartas.show(conteudo, chave);
         botoes.get(chave).setSelected(true);
         menu.mover(botoes.get(chave));
@@ -130,6 +149,15 @@ public class JanelaPrincipal extends JFrame {
 
     public PainelClube getPainelClube() {
         return painelClube;
+    }
+
+    public boolean isGerente() {
+        return gerente;
+    }
+
+    /** Só existe quando o usuário logado é gerente (senão devolve null). */
+    public PainelFaturamento getPainelFaturamento() {
+        return painelFaturamento;
     }
 
     public PainelCadastro getPainelCadastro() {

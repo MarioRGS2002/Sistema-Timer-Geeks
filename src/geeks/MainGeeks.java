@@ -1,11 +1,11 @@
 package geeks;
 
-import geeks.controller.GeeksController;
+import geeks.controller.LoginController;
 
 import javax.swing.SwingUtilities;
 
 public class MainGeeks {
     public static void main(String[] args) {
-        SwingUtilities.invokeLater(GeeksController::new);
+        SwingUtilities.invokeLater(LoginController::new);
     }
 }

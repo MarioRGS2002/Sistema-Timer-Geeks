@@ -25,6 +25,6 @@ public enum Plano {
 
     // Benefícios de EXEMPLO: definir com o cliente
     public String[] getBeneficios() {
-        return new String[]{"[Benefício 1]", "[Benefício 2]", "[Benefício 3]"};
+        return new String[]{"Ganhe uma hora diária grátis em qualquer aparelho!", "Tenha acesso a descontos exclusivos!"};
     }
 }
