@@ -7,7 +7,11 @@ import javax.swing.JViewport;
 import javax.swing.border.EmptyBorder;
 import java.awt.AlphaComposite;
 import java.awt.BorderLayout;
+import java.awt.Color;
 import java.awt.Dimension;
+import java.awt.RadialGradientPaint;
+import java.awt.Rectangle;
+import java.awt.geom.Point2D;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
@@ -79,8 +83,11 @@ public abstract class PainelPagina extends JPanel {
         int w = getWidth(), h = getHeight();
         g.setColor(Tema.FUNDO);
         g.fillRect(0, 0, w, h);
-        g.setColor(Tema.AMARELO);
-        g.fillOval(w - 150, h - 160, 260, 260);
+        // Brilho amarelo suave no canto: mantém a identidade sem cobrir cartões e botões
+        float raio = 420f;
+        g.setPaint(new RadialGradientPaint(new Point2D.Float(w, h), raio, new float[]{0f, 1f},
+                new Color[]{new Color(255, 214, 10, 46), new Color(255, 214, 10, 0)}));
+        g.fill(new Rectangle(w - (int) raio, h - (int) raio, (int) raio, (int) raio));
         g.dispose();
     }
 }

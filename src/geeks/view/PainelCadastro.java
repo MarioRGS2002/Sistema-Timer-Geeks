@@ -23,7 +23,6 @@ public class PainelCadastro extends PainelPagina {
 
     public PainelCadastro() {
         super("Cadastro de usuários");
-        setLadoDireito(btSalvar);
         JPanel corpo = Componentes.transparente(new GridLayout(1, 2, 26, 0));
 
         CartaoGeeks form = new CartaoGeeks();
@@ -40,7 +39,9 @@ public class PainelCadastro extends PainelPagina {
         JPanel envoltorio = Componentes.transparente(new BorderLayout());
         envoltorio.add(campos, BorderLayout.NORTH);
         JPanel rodape = Componentes.transparente(new BorderLayout());
+        // Salvar fica junto do formulário, ao lado de Limpar (antes ficava longe, no topo da tela)
         rodape.add(btLimpar, BorderLayout.WEST);
+        rodape.add(btSalvar, BorderLayout.EAST);
         form.add(Componentes.rotuloIcone("Dados do cliente", Icone.Tipo.USUARIO_MAIS, Tema.BRANCO, 22), BorderLayout.NORTH);
         form.add(envoltorio, BorderLayout.CENTER);
         form.add(rodape, BorderLayout.SOUTH);
@@ -59,27 +60,25 @@ public class PainelCadastro extends PainelPagina {
 
     /** Em vez de repetir "Cliente já cadastrado?", o cadastro convida a entrar no clube logo após salvar. */
     private CartaoGeeks criarCartaoClube() {
+        // Faixa colorida presa no topo do cartão (antes ficava solta no meio)
         CartaoGeeks c = new CartaoGeeks(Tema.AMARELO, Tema.AMARELO, false);
-        c.setLayout(new GridBagLayout());
+        c.setLayout(new BorderLayout());
+        c.setBorder(new EmptyBorder(22, 22, 22, 22));
+        c.add(new Componentes.Faixa(), BorderLayout.NORTH);
+        JPanel miolo = Componentes.transparente(new GridBagLayout());
+        c.add(miolo, BorderLayout.CENTER);
         GridBagConstraints g = new GridBagConstraints();
         g.gridx = 0;
-        g.fill = GridBagConstraints.HORIZONTAL;
-        g.weightx = 1;
-        g.insets = new Insets(8, 28, 8, 28);
-
-        g.gridy = 0;
-        g.insets = new Insets(0, 0, 18, 0);
-        c.add(new Componentes.Faixa(), g);
         g.insets = new Insets(8, 28, 8, 28);
         g.gridy = 1;
-        g.fill = GridBagConstraints.NONE;
-        c.add(new Componentes.BlocoIcone(Icone.Tipo.COROA, Tema.FUNDO, Tema.AMARELO, 84, true), g);
+        miolo.add(new Componentes.BlocoIcone(Icone.Tipo.COROA, Tema.FUNDO, Tema.AMARELO, 84, true), g);
         g.gridy = 2;
-        c.add(Componentes.rotulo("CLUBE GEEKS", Font.BOLD | Font.ITALIC, 38, Tema.FUNDO), g);
+        miolo.add(Componentes.rotulo("CLUBE GEEKS", Font.BOLD | Font.ITALIC, 38, Tema.FUNDO), g);
         g.gridy = 3;
-        c.add(Componentes.rotulo("Vantagens para clientes Geeks", Font.BOLD, 16, Tema.FUNDO), g);
+        miolo.add(Componentes.rotulo("Vantagens para clientes Geeks", Font.BOLD, 16, Tema.FUNDO), g);
         g.gridy = 4;
-        c.add(chkPlano, g);
+        g.insets = new Insets(18, 28, 8, 28);
+        miolo.add(chkPlano, g);
         return c;
     }
 

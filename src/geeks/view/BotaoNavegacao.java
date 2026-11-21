@@ -15,6 +15,7 @@ import java.awt.geom.RoundRectangle2D;
 /** Item do menu lateral: vira uma pílula amarela quando selecionado. */
 public class BotaoNavegacao extends JToggleButton {
     private final EfeitoClique efeito = new EfeitoClique(this);
+    private boolean passando;
 
     public BotaoNavegacao(String texto, Icone.Tipo icone) {
         super(texto);
@@ -34,6 +35,18 @@ public class BotaoNavegacao extends JToggleButton {
                 boolean selecionado = isSelected();
                 efeito.iniciar(e.getPoint(), selecionado ? Tema.BRANCO : Tema.AMARELO, selecionado ? Tema.FUNDO : Tema.AMARELO);
             }
+
+            @Override
+            public void mouseEntered(MouseEvent e) {
+                passando = true;
+                repaint();
+            }
+
+            @Override
+            public void mouseExited(MouseEvent e) {
+                passando = false;
+                repaint();
+            }
         });
     }
 
@@ -46,6 +59,11 @@ public class BotaoNavegacao extends JToggleButton {
     protected void paintComponent(Graphics g0) {
         Graphics2D g = (Graphics2D) g0.create();
         g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        if (passando && !isSelected()) {
+            // Hover: fundo cinza discreto (a pílula amarela do item selecionado é desenhada pelo MenuLateral)
+            g.setColor(new Color(0x242424));
+            g.fillRoundRect(0, 0, getWidth(), getHeight(), 16, 16);
+        }
         efeito.pintar(g, new RoundRectangle2D.Double(0, 0, getWidth(), getHeight(), 16, 16));
         g.dispose();
         super.paintComponent(g0);

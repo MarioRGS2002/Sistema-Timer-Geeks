@@ -7,12 +7,14 @@ import javax.swing.JPanel;
 import javax.swing.Timer;
 import javax.swing.border.EmptyBorder;
 import java.awt.BorderLayout;
+import java.awt.Color;
 import java.awt.FlowLayout;
 import java.awt.Font;
 import java.awt.GridLayout;
 import java.awt.event.ActionListener;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -22,6 +24,7 @@ import java.util.Set;
 
 public class PainelSessoes extends PainelPagina {
     private static final double REFERENCIA_BARRA_MIN = 180; // só efeito visual: barra cheia = 3h
+    private static final DateTimeFormatter HORA = DateTimeFormatter.ofPattern("HH:mm");
 
     private final JPanel grade = Componentes.transparente(new GridLayout(0, 3, 20, 20));
     private final Componentes.Pilula pilulaAtivas = new Componentes.Pilula(Icone.Tipo.CONTROLE, "0 ativas");
@@ -130,9 +133,23 @@ public class PainelSessoes extends PainelPagina {
         nomes.add(linhaChip);
         topo.add(nomes, BorderLayout.CENTER);
 
-        JPanel meio = Componentes.transparente(new GridLayout(2, 1, 0, 8));
-        meio.add(new Componentes.Barra(s.getDuracao().toMinutes() / REFERENCIA_BARRA_MIN,
-                atrasoAnimacao < 0 ? -1 : atrasoAnimacao + 150));
+        // A barra muda de cor conforme a sessão fica longa (2h laranja, 3h vermelho)
+        long minutos = s.getDuracao().toMinutes();
+        int atrasoBarra = atrasoAnimacao < 0 ? -1 : atrasoAnimacao + 150;
+        Componentes.Barra barra;
+        if (minutos >= 180) {
+            barra = new Componentes.Barra(1, atrasoBarra, Tema.VERMELHO, new Color(0xFF2D55));
+        } else if (minutos >= 120) {
+            barra = new Componentes.Barra(minutos / REFERENCIA_BARRA_MIN, atrasoBarra, new Color(0xFFB800), new Color(0xFF8A00));
+        } else {
+            barra = new Componentes.Barra(minutos / REFERENCIA_BARRA_MIN, atrasoBarra);
+        }
+        JPanel meio = Componentes.transparente(new GridLayout(3, 1, 0, 6));
+        // Horário de início, para o atendente conferir sem abrir nada
+        meio.add(Componentes.rotulo("Início às " + s.getInicio().format(HORA)
+                + (minutos >= 120 ? "  ·  sessão longa" : ""), Font.PLAIN, 13,
+                minutos >= 120 ? new Color(0xFFB800) : new Color(0x8A8A8A)));
+        meio.add(barra);
         JPanel valores = Componentes.transparente(new BorderLayout());
         valores.add(Componentes.rotuloIcone(Formatador.duracao(s.getDuracao()), Icone.Tipo.RELOGIO, Tema.CINZA, 15), BorderLayout.WEST);
         valores.add(Componentes.rotuloIcone(Formatador.moeda(s.getValor()), Icone.Tipo.MOEDA, Tema.AMARELO, 15), BorderLayout.EAST);

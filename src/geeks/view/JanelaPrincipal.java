@@ -8,17 +8,26 @@ import javax.swing.ImageIcon;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
+import javax.swing.Timer;
 import java.awt.BorderLayout;
 import java.awt.CardLayout;
+import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.Font;
+import java.awt.Graphics;
+import java.awt.Graphics2D;
+import java.awt.GridLayout;
 import java.awt.HeadlessException;
 import java.awt.Image;
+import java.awt.RenderingHints;
 import java.awt.event.ActionListener;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 /** Janela principal: menu lateral com o logo da Geeks e as telas do sistema. */
@@ -90,7 +99,42 @@ public class JanelaPrincipal extends JFrame {
         adicionarItem(menu, CLUBE, "Clube Geeks", Icone.Tipo.COROA);
         adicionarItem(menu, CADASTROS, "Cadastros", Icone.Tipo.USUARIO_MAIS);
         menu.add(Box.createVerticalGlue());
+        menu.add(criarRelogio());
         return menu;
+    }
+
+    /** Relógio no rodapé do menu: o atendente vê a hora sem sair do sistema. */
+    private JPanel criarRelogio() {
+        JLabel hora = Componentes.rotulo("", Font.BOLD, 30, Tema.BRANCO);
+        JLabel data = Componentes.rotulo("", Font.PLAIN, 14, Tema.CINZA);
+        Runnable atualizar = () -> {
+            LocalDateTime agora = LocalDateTime.now();
+            hora.setText(agora.format(DateTimeFormatter.ofPattern("HH:mm")));
+            String d = agora.format(DateTimeFormatter.ofPattern("EEEE, d 'de' MMM", new Locale("pt", "BR")));
+            data.setText(Character.toUpperCase(d.charAt(0)) + d.substring(1));
+        };
+        atualizar.run();
+        new Timer(1_000, e -> atualizar.run()).start();
+
+        JPanel caixa = new JPanel(new GridLayout(2, 1, 0, 2)) {
+            @Override
+            protected void paintComponent(Graphics g0) {
+                Graphics2D g = (Graphics2D) g0.create();
+                g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g.setColor(new Color(0x1E1E1E));
+                g.fillRoundRect(0, 0, getWidth(), getHeight(), 16, 16);
+                g.setColor(Tema.AMARELO);
+                g.fillRoundRect(0, 12, 4, getHeight() - 24, 4, 4);
+                g.dispose();
+            }
+        };
+        caixa.setOpaque(false);
+        caixa.setBorder(BorderFactory.createEmptyBorder(12, 18, 12, 14));
+        caixa.add(hora);
+        caixa.add(data);
+        caixa.setAlignmentX(Component.LEFT_ALIGNMENT);
+        caixa.setMaximumSize(new Dimension(Integer.MAX_VALUE, caixa.getPreferredSize().height));
+        return caixa;
     }
 
     private void adicionarItem(JPanel menu, String chave, String texto, Icone.Tipo icone) {
