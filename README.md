@@ -15,3 +15,6 @@ Clube Geeks: plano único de R$ 180,00 (enum Plano).
 Animações (classe Animacao): clique (EfeitoClique), entrada de telas e janelas, menu com pílula deslizante, cartões com hover/entrada/saída, barras e valores que "contam".
 Janelas de confirmação, aviso, sucesso e formulários seguem o tema (FormularioGeeks e Form*, abertas por Dialogos).
 Fonte opcional: instale "Barlow" para ficar idêntico ao design; sem ela o sistema usa Segoe UI/SansSerif.
+
+Login: MainGeeks abre o LoginController. Usuários de EXEMPLO (LoginModel, senha guardada como hash SHA-256): atendente / geeks123 e gerente / gerente123.
+Faturamento: tela exclusiva do gerente (PainelFaturamento). Os valores são de EXEMPLO (FaturamentoModel), só para a interface; ainda sem backend.

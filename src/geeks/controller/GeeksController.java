@@ -2,7 +2,11 @@ package geeks.controller;
 
 import geeks.model.Cliente;
 import geeks.model.Dispositivo;
+import geeks.model.FaturamentoModel;
 import geeks.model.GeeksModel;
+import geeks.model.PeriodoFaturamento;
+import geeks.model.SerieFaturamento;
+import geeks.model.Usuario;
 import geeks.model.Plano;
 import geeks.model.Reserva;
 import geeks.model.Sessao;
@@ -28,9 +32,15 @@ public class GeeksController {
     private YearMonth mesAtual = YearMonth.now();
     private LocalDate diaSelecionado = LocalDate.now();
 
-    public GeeksController() {
+    private final boolean gerente;
+    private final FaturamentoModel faturamento = new FaturamentoModel();
+    private PeriodoFaturamento periodoFaturamento = PeriodoFaturamento.SEMANA;
+    private LocalDate referenciaFaturamento = LocalDate.now();
+
+    public GeeksController(Usuario usuario) {
+        this.gerente = usuario != null && usuario.isGerente();
         this.model = new GeeksModel();
-        this.view = new JanelaPrincipal();
+        this.view = new JanelaPrincipal(gerente);
 
         ligarNavegacao();
         ligarSessoes();
@@ -38,6 +48,9 @@ public class GeeksController {
         ligarHistorico();
         ligarClube();
         ligarCadastro();
+        if (gerente) {
+            ligarFaturamento();
+        }
 
         // Atualiza tempo e valor das sessões ativas a cada 30 segundos
         new Timer(30_000, e -> atualizarSessoes()).start();
@@ -50,7 +63,13 @@ public class GeeksController {
     // ---------- Ligações View -> Model ----------
 
     private void ligarNavegacao() {
-        view.addListenerNavegacao(e -> view.mostrarTela(e.getActionCommand()));
+        view.addListenerNavegacao(e -> {
+            String tela = e.getActionCommand();
+            if (JanelaPrincipal.FATURAMENTO.equals(tela) && !gerente) {
+                return; // a tela de faturamento é exclusiva do gerente
+            }
+            view.mostrarTela(tela);
+        });
     }
 
     private void ligarSessoes() {
@@ -106,6 +125,38 @@ public class GeeksController {
         atualizarSessoes();
         atualizarReservas();
         atualizarHistorico();
+        if (gerente) {
+            atualizarFaturamento();
+        }
+    }
+
+    // ---------- Faturamento (somente gerente) ----------
+
+    private void ligarFaturamento() {
+        view.getPainelFaturamento().addListenerPeriodo(e -> {
+            periodoFaturamento = PeriodoFaturamento.valueOf(e.getActionCommand());
+            atualizarFaturamento();
+        });
+        view.getPainelFaturamento().addListenerAnterior(e -> {
+            referenciaFaturamento = periodoFaturamento.deslocar(referenciaFaturamento, -1);
+            atualizarFaturamento();
+        });
+        view.getPainelFaturamento().addListenerProximo(e -> {
+            referenciaFaturamento = periodoFaturamento.deslocar(referenciaFaturamento, 1);
+            atualizarFaturamento();
+        });
+        view.getPainelFaturamento().addListenerHoje(e -> {
+            referenciaFaturamento = LocalDate.now();
+            atualizarFaturamento();
+        });
+    }
+
+    private void atualizarFaturamento() {
+        LocalDate hoje = LocalDate.now();
+        SerieFaturamento serie = faturamento.serie(periodoFaturamento, referenciaFaturamento);
+        boolean podeAvancar = !periodoFaturamento.inicio(periodoFaturamento.deslocar(referenciaFaturamento, 1)).isAfter(hoje);
+        boolean periodoAtual = periodoFaturamento.inicio(referenciaFaturamento).equals(periodoFaturamento.inicio(hoje));
+        view.getPainelFaturamento().atualizar(serie, podeAvancar, periodoAtual);
     }
 
     private void atualizarSessoes() {
