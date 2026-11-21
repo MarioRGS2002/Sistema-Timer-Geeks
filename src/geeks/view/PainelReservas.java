@@ -29,8 +29,8 @@ import java.util.Set;
 public class PainelReservas extends PainelPagina {
     private final JLabel lbMes = Componentes.rotulo("", Font.BOLD, 24, Tema.BRANCO);
     private final BotaoDia[] dias = new BotaoDia[42];
-    private final BotaoGeeks btAnterior = new BotaoGeeks("<", null, BotaoGeeks.Estilo.CONTORNO);
-    private final BotaoGeeks btProximo = new BotaoGeeks(">", null, BotaoGeeks.Estilo.CONTORNO);
+    private final BotaoGeeks btAnterior = new BotaoGeeks("", Icone.Tipo.SETA_ESQUERDA, BotaoGeeks.Estilo.CONTORNO);
+    private final BotaoGeeks btProximo = new BotaoGeeks("", Icone.Tipo.SETA_DIREITA, BotaoGeeks.Estilo.CONTORNO);
     private final BotaoGeeks btRegistrar = new BotaoGeeks("Registrar reserva", Icone.Tipo.MAIS, BotaoGeeks.Estilo.PREENCHIDO);
     private final BotaoGeeks btGerenciar = new BotaoGeeks("Gerenciar reservas", Icone.Tipo.LISTA, BotaoGeeks.Estilo.CONTORNO);
     private final BotaoGeeks btAlterar = new BotaoGeeks("Alterar reserva", Icone.Tipo.LAPIS, BotaoGeeks.Estilo.CONTORNO);
@@ -46,6 +46,12 @@ public class PainelReservas extends PainelPagina {
         calendario.setBorder(new EmptyBorder(18, 18, 18, 18));
         JPanel nav = Componentes.transparente(new BorderLayout());
         lbMes.setHorizontalAlignment(SwingConstants.CENTER);
+        for (BotaoGeeks seta : new BotaoGeeks[]{btAnterior, btProximo}) {
+            seta.setIconTextGap(0);
+            seta.setBorder(new EmptyBorder(10, 14, 10, 14));
+        }
+        btAnterior.setToolTipText("Mês anterior");
+        btProximo.setToolTipText("Próximo mês");
         nav.add(btAnterior, BorderLayout.WEST);
         nav.add(lbMes, BorderLayout.CENTER);
         nav.add(btProximo, BorderLayout.EAST);

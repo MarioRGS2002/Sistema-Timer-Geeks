@@ -170,6 +170,8 @@ public final class Componentes {
     public static class Barra extends JComponent {
         private final double alvo; // 0..1
         private final int atrasoMs;
+        private final Color corInicio;
+        private final Color corFim;
         private double atual;
         private boolean iniciou;
 
@@ -179,9 +181,15 @@ public final class Componentes {
 
         /** atrasoMs >= 0 faz a barra crescer do zero até o valor ao aparecer na tela. */
         public Barra(double percentual, int atrasoMs) {
+            this(percentual, atrasoMs, Tema.AMARELO, new Color(0xFFB800));
+        }
+
+        public Barra(double percentual, int atrasoMs, Color corInicio, Color corFim) {
             this.alvo = Math.max(0.04, Math.min(1, percentual));
             this.atrasoMs = atrasoMs;
             this.atual = atrasoMs < 0 ? alvo : 0;
+            this.corInicio = corInicio;
+            this.corFim = corFim;
         }
 
         @Override
@@ -213,7 +221,7 @@ public final class Componentes {
             g2.fillRoundRect(0, 0, getWidth(), 8, 8, 8);
             int largura = (int) (getWidth() * atual);
             if (largura > 0) {
-                g2.setPaint(new GradientPaint(0, 0, Tema.AMARELO, getWidth(), 0, new Color(0xFFB800)));
+                g2.setPaint(new GradientPaint(0, 0, corInicio, getWidth(), 0, corFim));
                 g2.fillRoundRect(0, 0, Math.max(8, largura), 8, 8, 8);
             }
             g2.dispose();
