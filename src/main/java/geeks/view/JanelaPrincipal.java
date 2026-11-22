@@ -38,6 +38,7 @@ public class JanelaPrincipal extends JFrame {
     public static final String CLUBE = "CLUBE";
     public static final String CADASTROS = "CADASTROS";
     public static final String FATURAMENTO = "FATURAMENTO";
+    public static final String FUNCIONARIOS = "FUNCIONARIOS";
 
     private final CardLayout cartas = new CardLayout();
     private final JPanel conteudo = new JPanel(cartas);
@@ -47,6 +48,7 @@ public class JanelaPrincipal extends JFrame {
     private MenuLateral menu;
     private final boolean gerente;
     private PainelFaturamento painelFaturamento;
+    private PainelFuncionarios painelFuncionarios;
 
     private final PainelSessoes painelSessoes = new PainelSessoes();
     private final PainelReservas painelReservas = new PainelReservas();
@@ -58,7 +60,7 @@ public class JanelaPrincipal extends JFrame {
         this(false);
     }
 
-    /** @param gerente true libera as telas exclusivas do gerente (Faturamento) */
+    /** @param gerente true libera as telas exclusivas do gerente (Faturamento e Funcionários) */
     public JanelaPrincipal(boolean gerente) throws HeadlessException {
         this.gerente = gerente;
         setTitle("Geeks - Sistema de Gestão");
@@ -73,6 +75,8 @@ public class JanelaPrincipal extends JFrame {
         if (gerente) {
             painelFaturamento = new PainelFaturamento();
             registrar(FATURAMENTO, painelFaturamento);
+            painelFuncionarios = new PainelFuncionarios();
+            registrar(FUNCIONARIOS, painelFuncionarios);
         }
         add(conteudo, BorderLayout.CENTER);
 
@@ -113,6 +117,7 @@ public class JanelaPrincipal extends JFrame {
         adicionarItem(menu, CADASTROS, "Cadastros", Icone.Tipo.USUARIO_MAIS);
         if (gerente) {
             adicionarItem(menu, FATURAMENTO, "Faturamento", Icone.Tipo.MOEDA);
+            adicionarItem(menu, FUNCIONARIOS, "Funcionários", Icone.Tipo.CADEADO);
         }
         menu.add(Box.createVerticalGlue());
         menu.add(criarRelogio());
@@ -202,6 +207,11 @@ public class JanelaPrincipal extends JFrame {
     /** Só existe quando o usuário logado é gerente (senão devolve null). */
     public PainelFaturamento getPainelFaturamento() {
         return painelFaturamento;
+    }
+
+    /** Só existe quando o usuário logado é gerente (senão devolve null). */
+    public PainelFuncionarios getPainelFuncionarios() {
+        return painelFuncionarios;
     }
 
     public PainelCadastro getPainelCadastro() {

@@ -3,6 +3,10 @@ package geeks.controller;
 import geeks.model.Cliente;
 import geeks.model.Dispositivo;
 import geeks.model.FaturamentoModel;
+import geeks.model.Funcionario;
+import geeks.model.FuncionariosModel;
+import geeks.model.Perfil;
+import geeks.view.FormFuncionario;
 import geeks.model.GeeksModel;
 import geeks.model.PeriodoFaturamento;
 import geeks.model.SerieFaturamento;
@@ -34,11 +38,14 @@ public class GeeksController {
 
     private final boolean gerente;
     private final FaturamentoModel faturamento = new FaturamentoModel();
+    private final FuncionariosModel funcionarios = new FuncionariosModel();
+    private final int idLogado;
     private PeriodoFaturamento periodoFaturamento = PeriodoFaturamento.SEMANA;
     private LocalDate referenciaFaturamento = LocalDate.now();
 
     public GeeksController(Usuario usuario) {
         this.gerente = usuario != null && usuario.isGerente();
+        this.idLogado = usuario == null ? 0 : usuario.getIdFuncionario();
         this.model = new GeeksModel();
         this.view = new JanelaPrincipal(gerente);
 
@@ -50,6 +57,7 @@ public class GeeksController {
         ligarCadastro();
         if (gerente) {
             ligarFaturamento();
+            ligarFuncionarios();
         }
 
         // Atualiza tempo e valor das sessões ativas a cada 30 segundos
@@ -65,8 +73,11 @@ public class GeeksController {
     private void ligarNavegacao() {
         view.addListenerNavegacao(e -> {
             String tela = e.getActionCommand();
-            if (JanelaPrincipal.FATURAMENTO.equals(tela) && !gerente) {
-                return; // a tela de faturamento é exclusiva do gerente
+            if ((JanelaPrincipal.FATURAMENTO.equals(tela) || JanelaPrincipal.FUNCIONARIOS.equals(tela)) && !gerente) {
+                return; // faturamento e funcionários são exclusivos do gerente
+            }
+            if (JanelaPrincipal.FUNCIONARIOS.equals(tela)) {
+                atualizarFuncionarios();
             }
             view.mostrarTela(tela);
         });
@@ -157,6 +168,84 @@ public class GeeksController {
         boolean podeAvancar = !periodoFaturamento.inicio(periodoFaturamento.deslocar(referenciaFaturamento, 1)).isAfter(hoje);
         boolean periodoAtual = periodoFaturamento.inicio(referenciaFaturamento).equals(periodoFaturamento.inicio(hoje));
         view.getPainelFaturamento().atualizar(serie, podeAvancar, periodoAtual);
+    }
+
+    // ---------- Funcionários (somente gerente) ----------
+
+    private void ligarFuncionarios() {
+        var painel = view.getPainelFuncionarios();
+        painel.addListenerNovo(e -> novoFuncionario());
+        painel.addListenerTrocarSenha(e -> trocarSenha(Integer.parseInt(e.getActionCommand())));
+        painel.addListenerDesativar(e -> desativarFuncionario(Integer.parseInt(e.getActionCommand())));
+        painel.addListenerReativar(e -> reativarFuncionario(Integer.parseInt(e.getActionCommand())));
+    }
+
+    private void atualizarFuncionarios() {
+        view.getPainelFuncionarios().atualizar(funcionarios.listar(), idLogado);
+    }
+
+    private Funcionario funcionarioPorId(int id) {
+        return funcionarios.listar().stream().filter(f -> f.getId() == id).findFirst().orElse(null);
+    }
+
+    private void novoFuncionario() {
+        FormFuncionario form = Dialogos.pedirNovoFuncionario(view);
+        if (form == null) {
+            return;
+        }
+        try {
+            Funcionario f = funcionarios.cadastrar(form.getLogin(), form.getNome(),
+                    form.isGerente() ? Perfil.GERENTE : Perfil.ATENDENTE, form.getSenha(), form.getConfirmacao());
+            atualizarFuncionarios();
+            Dialogos.sucesso(view, f.getNome() + " já pode entrar com o login \"" + f.getLogin() + "\".");
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            Dialogos.erro(view, ex.getMessage());
+        } finally {
+            form.limparSenhas();
+        }
+    }
+
+    private void trocarSenha(int id) {
+        Funcionario f = funcionarioPorId(id);
+        if (f == null) {
+            return;
+        }
+        FormFuncionario form = Dialogos.pedirNovaSenha(view, f.getNome());
+        if (form == null) {
+            return;
+        }
+        try {
+            funcionarios.trocarSenha(id, form.getSenha(), form.getConfirmacao());
+            Dialogos.sucesso(view, "Senha de " + f.getNome() + " alterada.");
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            Dialogos.erro(view, ex.getMessage());
+        } finally {
+            form.limparSenhas();
+        }
+    }
+
+    private void desativarFuncionario(int id) {
+        Funcionario f = funcionarioPorId(id);
+        if (f == null || !Dialogos.confirmar(view, "Desativar funcionário",
+                f.getNome() + " não vai mais conseguir entrar no sistema. O histórico dele continua guardado "
+                        + "e você pode reativar quando quiser.", "Desativar", true)) {
+            return;
+        }
+        try {
+            funcionarios.desativar(id);
+            atualizarFuncionarios();
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            Dialogos.erro(view, ex.getMessage());
+        }
+    }
+
+    private void reativarFuncionario(int id) {
+        try {
+            funcionarios.reativar(id);
+            atualizarFuncionarios();
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            Dialogos.erro(view, ex.getMessage());
+        }
     }
 
     private void atualizarSessoes() {

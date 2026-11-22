@@ -50,6 +50,18 @@ public final class Dialogos {
         return exibir(pai, titulo, form) ? form.getSelecionada() : null;
     }
 
+    /** Formulário "Novo funcionário" preenchido, ou null se cancelar. Apague as senhas depois de usar. */
+    public static FormFuncionario pedirNovoFuncionario(Component pai) {
+        FormFuncionario form = new FormFuncionario();
+        return exibir(pai, "Novo funcionário", form) ? form : null;
+    }
+
+    /** Formulário "Trocar senha" preenchido, ou null se cancelar. Apague as senhas depois de usar. */
+    public static FormFuncionario pedirNovaSenha(Component pai, String nomeFuncionario) {
+        FormFuncionario form = FormFuncionario.trocarSenha(nomeFuncionario);
+        return exibir(pai, "Trocar senha", form) ? form : null;
+    }
+
     // ---------- Confirmações e avisos ----------
 
     public static boolean confirmarEncerramento(Component pai, Sessao sessao) {
