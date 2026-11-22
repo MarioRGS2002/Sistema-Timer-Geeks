@@ -58,45 +58,90 @@ public class GeeksModel {
 
     // ---------- Clientes ----------
 
-    public Cliente cadastrarCliente(String nome, String idadeTxt, String telefone, String cpf, String responsavel) {
+    /**
+     * Cadastra o cliente com a data de nascimento e, se houver, o responsável (nome, CPF, telefone,
+     * parentesco). Menor de 18 anos exige responsável com nome e CPF válido.
+     */
+    public Cliente cadastrarCliente(String nome, String nascimentoTxt, String telefone, String cpf,
+                                    String respNome, String respCpf, String respTelefone, String respParentesco) {
         if (nome == null || nome.isBlank()) {
             throw new IllegalArgumentException("Informe o nome do cliente.");
         }
         if (nome.trim().length() > 100) {
             throw new IllegalArgumentException("O nome pode ter no máximo 100 caracteres.");
         }
-        int idade;
-        try {
-            idade = Integer.parseInt(idadeTxt == null ? "" : idadeTxt.trim());
-        } catch (NumberFormatException e) {
-            throw new IllegalArgumentException("Informe uma idade válida.");
-        }
-        if (idade < 0 || idade > 120) {
-            throw new IllegalArgumentException("Informe uma idade válida.");
+        LocalDate hoje = LocalDate.now();
+        LocalDate nascimento = lerData(nascimentoTxt);
+        if (nascimento == null || nascimento.isAfter(hoje) || nascimento.isBefore(hoje.minusYears(120))) {
+            throw new IllegalArgumentException("Informe a data de nascimento no formato dd/mm/aaaa (ex.: 15/03/2010).");
         }
         String cpfNumeros = cpf == null ? "" : cpf.replaceAll("\\D", "");
         if (!cpfValido(cpfNumeros)) {
             throw new IllegalArgumentException("CPF inválido.");
         }
-        if (idade < 18 && (responsavel == null || responsavel.isBlank())) {
-            throw new IllegalArgumentException("Clientes menores de 18 anos precisam de um responsável.");
-        }
         String tel = telefone == null ? "" : telefone.trim();
         if (tel.length() > 20) {
             throw new IllegalArgumentException("Telefone inválido.");
         }
-        // PENDÊNCIA DO FRONT: a tela pede a idade (não a data de nascimento) e só o NOME do
-        // responsável. data_nascimento = hoje - idade; o responsável não é gravado porque o
-        // banco exige o CPF dele (ver README, "Pendências que dependem do front").
-        LocalDate nascimento = LocalDate.now().minusYears(idade);
-        LocalDate hoje = LocalDate.now();
+        boolean menor = nascimento.plusYears(18).isAfter(hoje);
+        String rNome = respNome == null ? "" : respNome.trim();
+        String rCpf = respCpf == null ? "" : respCpf.replaceAll("\\D", "");
+        String rTel = respTelefone == null ? "" : respTelefone.trim();
+        String rPar = respParentesco == null ? "" : respParentesco.trim();
+        boolean temResponsavel = !rNome.isEmpty() || !rCpf.isEmpty();
+        if (menor && !temResponsavel) {
+            throw new IllegalArgumentException("Clientes menores de 18 anos precisam de um responsável (nome e CPF).");
+        }
+        if (temResponsavel) {
+            if (rNome.isEmpty() || rNome.length() > 100) {
+                throw new IllegalArgumentException("Informe o nome do responsável (até 100 caracteres).");
+            }
+            if (!cpfValido(rCpf)) {
+                throw new IllegalArgumentException("CPF do responsável inválido.");
+            }
+            if (rCpf.equals(cpfNumeros)) {
+                throw new IllegalArgumentException("O CPF do responsável não pode ser o mesmo do cliente.");
+            }
+            if (rTel.length() > 20 || rPar.length() > 50) {
+                throw new IllegalArgumentException("Telefone ou parentesco do responsável grande demais.");
+            }
+        }
         return Transacao.executar(c -> {
             if (clienteDAO.existeCpf(c, cpfNumeros)) {
                 throw new IllegalArgumentException("Já existe um cliente cadastrado com esse CPF.");
             }
             int id = clienteDAO.inserir(c, nome.trim(), nascimento, tel, cpfNumeros);
+            if (temResponsavel) {
+                clienteDAO.inserirResponsavel(c, id, rNome, rCpf, rTel, rPar);
+            }
             return clienteDAO.porId(c, id, hoje).orElseThrow();
         });
+    }
+
+    /** dd/mm/aaaa, d/m/aaaa ou só os 8 números (ddmmaaaa). null se inválida. */
+    static LocalDate lerData(String txt) {
+        if (txt == null) {
+            return null;
+        }
+        String t = txt.trim();
+        try {
+            if (t.matches("\\d{8}")) {
+                return LocalDate.of(Integer.parseInt(t.substring(4)), Integer.parseInt(t.substring(2, 4)),
+                        Integer.parseInt(t.substring(0, 2)));
+            }
+            String[] p = t.split("[/.-]");
+            if (p.length == 3 && p[2].length() == 4) {
+                return LocalDate.of(Integer.parseInt(p[2]), Integer.parseInt(p[1]), Integer.parseInt(p[0]));
+            }
+        } catch (RuntimeException e) {
+            return null; // dia/mês inexistente (ex.: 31/02)
+        }
+        return null;
+    }
+
+    /** Formas de pagamento cadastradas no banco (Dinheiro, PIX, Débito, Crédito...). */
+    public List<String> getFormasPagamento() {
+        return Transacao.consultar(pagamentoDAO::formas);
     }
 
     /** Busca por CPF (somente números) ou por parte do nome. */
@@ -119,6 +164,11 @@ public class GeeksModel {
      * Assinar: cria assinatura de 1 mês ou renova a ativa, e registra o pagamento da mensalidade.
      */
     public void assinarPlano(Cliente cliente, Plano plano) {
+        assinarPlano(cliente, plano, Regras.FORMA_PAGAMENTO_PADRAO);
+    }
+
+    /** @param formaPagamento forma da mensalidade (Dinheiro, PIX, Débito, Crédito) */
+    public void assinarPlano(Cliente cliente, Plano plano, String formaPagamento) {
         int idFuncionario = Contexto.idFuncionario();
         LocalDate hoje = LocalDate.now();
         if (plano == Plano.NENHUM) {
@@ -136,10 +186,15 @@ public class GeeksModel {
                 idAssinatura = assinaturaDAO.criar(c, Plano.CLUBE.getIdPlano(), cliente.getIdCliente(), hoje);
             }
             pagamentoDAO.registrar(c, LocalDateTime.now(), Plano.CLUBE.getValor(), null, PagamentoDAO.ASSINATURA,
-                    pagamentoDAO.idForma(c, Regras.FORMA_PAGAMENTO_PADRAO), idFuncionario, null, null, idAssinatura);
+                    idForma(c, formaPagamento), idFuncionario, null, null, idAssinatura);
             return null;
         });
         cliente.setPlano(Plano.CLUBE);
+    }
+
+    /** Forma de pagamento escolhida na tela (vazia = padrão). */
+    private int idForma(Connection c, String forma) throws SQLException {
+        return pagamentoDAO.idForma(c, forma == null || forma.isBlank() ? Regras.FORMA_PAGAMENTO_PADRAO : forma);
     }
 
     private boolean cpfValido(String cpf) {
@@ -160,12 +215,26 @@ public class GeeksModel {
 
     // ---------- Sessões ----------
 
-    /**
-     * Abre sessão. A tela não pergunta o tipo de tempo: sessões abertas no balcão são
-     * tempo ABERTO (presencial, sem hora para acabar). Se houver reserva do equipamento a
-     * menos de J minutos, avisa e sugere equipamentos livres do mesmo tipo.
-     */
+    /** Sessão em tempo ABERTO (livre). */
     public Sessao iniciarSessao(Cliente cliente, Dispositivo dispositivo) {
+        return iniciarSessao(cliente, dispositivo, null);
+    }
+
+    /**
+     * Abre sessão.
+     * <ul>
+     *   <li>{@code minutos == null}: tempo ABERTO (livre, sem hora para acabar; mínimo de 1 hora).</li>
+     *   <li>{@code minutos > 0}: tempo FECHADO até agora + minutos.</li>
+     *   <li>Se o cliente tem reserva neste equipamento "para agora", a sessão vira essa reserva:
+     *       FECHADO até o fim da reserva (ou mais, se escolheu mais tempo) e a entrada paga
+     *       é descontada no encerramento.</li>
+     *   <li>Reserva de OUTRO cliente antes do fim (+ folga J): recusa e sugere livres do mesmo tipo.</li>
+     * </ul>
+     */
+    public Sessao iniciarSessao(Cliente cliente, Dispositivo dispositivo, Integer minutos) {
+        if (minutos != null && (minutos < 15 || minutos > 12 * 60)) {
+            throw new IllegalArgumentException("Tempo fechado deve ser entre 15 minutos e 12 horas.");
+        }
         int idFuncionario = Contexto.idFuncionario();
         LocalDateTime agora = LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS);
         int idSessao = Transacao.executar(c -> {
@@ -173,17 +242,28 @@ public class GeeksModel {
             if (sessaoDAO.clienteEmSessaoAtiva(c, cliente.getIdCliente())) {
                 throw new IllegalStateException(cliente.getNome() + " já está em uma sessão ativa.");
             }
+            Optional<ReservaDAO.Linha> daReserva = reservaDAO.doClienteParaAgora(c, dispositivo.getIdEquipamento(),
+                    cliente.getIdCliente(), agora, Regras.JANELA_MINUTOS);
+            LocalDateTime previsto = minutos == null ? null : agora.plusMinutes(minutos);
+            if (daReserva.isPresent() && (previsto == null || previsto.isBefore(daReserva.get().fim))) {
+                previsto = daReserva.get().fim; // reserva é sempre tempo FECHADO
+            }
+            LocalDateTime limite = previsto == null ? agora : previsto;
             Optional<ReservaDAO.Linha> prox = reservaDAO.proximaAtiva(c, dispositivo.getIdEquipamento(), agora);
-            if (prox.isPresent() && prox.get().inicio.isBefore(agora.plusMinutes(Regras.JANELA_MINUTOS))
-                    && prox.get().idCliente != cliente.getIdCliente()) {
+            if (prox.isPresent() && prox.get().idCliente != cliente.getIdCliente()
+                    && prox.get().inicio.isBefore(limite.plusMinutes(Regras.JANELA_MINUTOS))) {
                 List<String> livres = equipamentoDAO.livresMesmoTipo(c, dispositivo.getIdEquipamento(), agora,
                         prox.get().fim, agora, Regras.JANELA_MINUTOS);
                 throw new IllegalStateException("O dispositivo " + dispositivo.getNome() + " tem reserva às "
                         + prox.get().inicio.toLocalTime() + "." + sugestao(livres));
             }
             try {
-                int id = sessaoDAO.abrir(c, TipoTempo.ABERTO.name(), agora, null, dispositivo.getTipo().getValorHora(),
+                TipoTempo tipo = previsto == null ? TipoTempo.ABERTO : TipoTempo.FECHADO;
+                int id = sessaoDAO.abrir(c, tipo.name(), agora, previsto, dispositivo.getTipo().getValorHora(),
                         dispositivo.getIdEquipamento(), idFuncionario, cliente.getIdCliente());
+                if (daReserva.isPresent()) {
+                    reservaDAO.vincularSessao(c, daReserva.get().idReserva, id);
+                }
                 equipamentoDAO.definirStatus(c, dispositivo.getIdEquipamento(), "EM_USO");
                 return id;
             } catch (SQLException e) {
@@ -208,40 +288,76 @@ public class GeeksModel {
      * DISPONIVEL na mesma transação.
      */
     public Sessao encerrarSessao(String id) {
+        encerrarSessao(id, Regras.FORMA_PAGAMENTO_PADRAO, false);
+        return null;
+    }
+
+    /**
+     * Prévia do encerramento AGORA (para a janela de confirmação): tempo usado, hora grátis,
+     * crédito usado/gerado, entrada já paga na reserva e o valor a pagar. Não grava nada.
+     */
+    public PreviaEncerramento previaEncerramento(String id, boolean usarCredito) {
+        int idSessao = idNumerico(id, "S");
+        LocalDateTime fim = LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS);
+        return Transacao.consultar(c -> calcularEncerramento(c, sessaoDAO.travarAtiva(c, idSessao), fim, usarCredito));
+    }
+
+    /**
+     * Encerra a sessão numa única transação: trava a sessão, grava fim e valor, a hora grátis
+     * do Clube usada, o crédito usado (abatido do saldo), os pagamentos (grátis = valor 0 sem
+     * forma; o resto na forma escolhida, já descontada a entrada da reserva) e o crédito do
+     * tempo pago e não usado. Em qualquer falha, nada fica gravado (rollback).
+     */
+    public PreviaEncerramento encerrarSessao(String id, String formaPagamento, boolean usarCredito) {
         int idSessao = idNumerico(id, "S");
         int idFuncionario = Contexto.idFuncionario();
         LocalDateTime fim = LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS);
-        Transacao.executar(c -> {
-            encerrar(c, idSessao, fim, idFuncionario);
-            return null;
-        });
-        return null;
+        return Transacao.executar(c -> encerrar(c, idSessao, fim, idFuncionario, formaPagamento, usarCredito));
     }
 
     /** Encerramento em uma conexão já em transação (usado também pelos testes). */
     public void encerrar(Connection c, int idSessao, LocalDateTime fim, int idFuncionario) throws SQLException {
+        encerrar(c, idSessao, fim, idFuncionario, Regras.FORMA_PAGAMENTO_PADRAO, false);
+    }
+
+    public PreviaEncerramento encerrar(Connection c, int idSessao, LocalDateTime fim, int idFuncionario,
+                                       String formaPagamento, boolean usarCredito) throws SQLException {
         SessaoDAO.Linha s = sessaoDAO.travarAtiva(c, idSessao);
-        LocalDate dia = s.inicio.toLocalDate();
-        int gratisDisponivel = 0;
-        if (assinaturaDAO.emDia(c, s.idCliente, dia)) {
-            gratisDisponivel = Math.max(0, Cobranca.SEGUNDOS_HORA - sessaoDAO.gratisUsadoNoDia(c, s.idCliente, dia));
-        }
-        Cobranca cob = Cobranca.calcular(TipoTempo.valueOf(s.tipoTempo), s.inicio, s.previsto, fim, s.valorHora,
-                gratisDisponivel);
+        PreviaEncerramento r = calcularEncerramento(c, s, fim, usarCredito);
+        Cobranca cob = r.getCobranca();
         sessaoDAO.encerrar(c, idSessao, fim, cob.getValor());
         sessaoDAO.definirGratis(c, idSessao, s.idCliente, cob.getSegundosGratis());
+        if (cob.getSegundosCredito() > 0) {
+            sessaoDAO.definirCredito(c, idSessao, s.idCliente, cob.getSegundosCredito());
+            creditoDAO.consumir(c, s.idCliente, s.idTipo, cob.getMinutosCreditoUsados(), fim.toLocalDate());
+        }
         if (cob.getSegundosGratis() > 0) {
             pagamentoDAO.registrar(c, fim, BigDecimal.ZERO.setScale(2), "SAIDA", PagamentoDAO.SESSAO, null,
                     idFuncionario, idSessao, null, null);
         }
-        if (cob.getValor().signum() > 0) {
-            pagamentoDAO.registrar(c, fim, cob.getValor(), "SAIDA", PagamentoDAO.SESSAO,
-                    pagamentoDAO.idForma(c, Regras.FORMA_PAGAMENTO_PADRAO), idFuncionario, idSessao, null, null);
+        if (r.getAPagar().signum() > 0) {
+            pagamentoDAO.registrar(c, fim, r.getAPagar(), "SAIDA", PagamentoDAO.SESSAO,
+                    idForma(c, formaPagamento), idFuncionario, idSessao, null, null);
         }
         if (cob.getMinutosCredito() > 0) {
             creditoDAO.gerar(c, s.idCliente, s.idTipo, idSessao, cob.getMinutosCredito(), fim);
         }
         equipamentoDAO.definirStatus(c, s.idEquipamento, "DISPONIVEL");
+        return r;
+    }
+
+    private PreviaEncerramento calcularEncerramento(Connection c, SessaoDAO.Linha s, LocalDateTime fim,
+                                                    boolean usarCredito) throws SQLException {
+        LocalDate dia = s.inicio.toLocalDate();
+        int gratisDisponivel = 0;
+        if (assinaturaDAO.emDia(c, s.idCliente, dia)) {
+            gratisDisponivel = Math.max(0, Cobranca.SEGUNDOS_HORA - sessaoDAO.gratisUsadoNoDia(c, s.idCliente, dia));
+        }
+        int saldo = creditoDAO.saldoDoTipo(c, s.idCliente, s.idTipo, fim.toLocalDate());
+        Cobranca cob = Cobranca.calcular(TipoTempo.valueOf(s.tipoTempo), s.inicio, s.previsto, fim, s.valorHora,
+                gratisDisponivel, usarCredito ? saldo * 60 : 0);
+        BigDecimal entrada = reservaDAO.entradaPagaDaSessao(c, s.idSessao);
+        return new PreviaEncerramento(cob, saldo, entrada);
     }
 
     public boolean dispositivoOcupado(Dispositivo dispositivo) {
@@ -295,25 +411,61 @@ public class GeeksModel {
     // ---------- Reservas ----------
 
     public Reserva registrarReserva(Cliente cliente, Dispositivo dispositivo, LocalDateTime dataHora) {
+        return registrarReserva(cliente, dispositivo, dataHora, Regras.DURACAO_RESERVA_MINUTOS, null, false);
+    }
+
+    /** Valor previsto de uma reserva (valor/hora do tipo x duração). */
+    public static BigDecimal valorReserva(Dispositivo d, int minutos) {
+        return d.getTipo().getValorHora().multiply(BigDecimal.valueOf(minutos))
+                .divide(BigDecimal.valueOf(60), 2, RoundingMode.HALF_UP);
+    }
+
+    /** Entrada mínima de uma reserva (percentual configurado, padrão 50%). */
+    public static BigDecimal entradaReserva(Dispositivo d, int minutos) {
+        return valorReserva(d, minutos).multiply(Regras.PERCENTUAL_ENTRADA).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+    }
+
+    /**
+     * Registra a reserva (sempre tempo FECHADO).
+     * @param minutos            duração (30 min a 8 h)
+     * @param formaEntrada       forma em que o cliente pagou a entrada agora; null = ainda não pagou
+     * @param ignorarAviso       true quando o atendente já confirmou o aviso de sessão sem hora para acabar
+     * @throws AvisoReserva      se o equipamento está em uso sem hora para acabar (pode confirmar e repetir)
+     */
+    public Reserva registrarReserva(Cliente cliente, Dispositivo dispositivo, LocalDateTime dataHora, int minutos,
+                                    String formaEntrada, boolean ignorarAviso) {
         LocalDateTime agora = LocalDateTime.now();
         if (dataHora.isBefore(agora)) {
             throw new IllegalArgumentException("A reserva precisa ser para um horário futuro.");
         }
-        LocalDateTime fim = dataHora.plusMinutes(Regras.DURACAO_RESERVA_MINUTOS);
-        BigDecimal valor = dispositivo.getTipo().getValorHora()
-                .multiply(BigDecimal.valueOf(Regras.DURACAO_RESERVA_MINUTOS))
-                .divide(BigDecimal.valueOf(60), 2, RoundingMode.HALF_UP);
-        BigDecimal entrada = valor.multiply(Regras.PERCENTUAL_ENTRADA).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+        if (minutos < 30 || minutos > 8 * 60) {
+            throw new IllegalArgumentException("A reserva deve durar de 30 minutos a 8 horas.");
+        }
+        LocalDateTime fim = dataHora.plusMinutes(minutos);
+        BigDecimal valor = valorReserva(dispositivo, minutos);
+        BigDecimal entrada = entradaReserva(dispositivo, minutos);
+        Integer idFuncionario = formaEntrada == null ? null : Contexto.idFuncionario();
         int id = Transacao.executar(c -> {
             equipamentoDAO.travar(c, dispositivo.getIdEquipamento());
-            verificarConflito(c, dispositivo, 0, dataHora, fim, agora);
-            return reservaDAO.inserir(c, dataHora, fim, valor, Regras.PERCENTUAL_ENTRADA, entrada,
+            verificarConflito(c, dispositivo, 0, dataHora, fim, agora, ignorarAviso);
+            int r = reservaDAO.inserir(c, dataHora, fim, valor, Regras.PERCENTUAL_ENTRADA, entrada,
                     cliente.getIdCliente(), dispositivo.getIdEquipamento());
+            if (formaEntrada != null && entrada.signum() > 0) {
+                pagamentoDAO.registrar(c, LocalDateTime.now(), entrada, "ENTRADA", PagamentoDAO.RESERVA,
+                        idForma(c, formaEntrada), idFuncionario, null, r, null);
+                reservaDAO.confirmarEntrada(c, r);
+            }
+            return r;
         });
         return new Reserva(id, cliente, dispositivo, dataHora, fim);
     }
 
     public void alterarReserva(Reserva reserva, LocalDateTime novaDataHora) {
+        alterarReserva(reserva, novaDataHora, false);
+    }
+
+    /** Muda o horário mantendo a duração. @throws AvisoReserva como em registrarReserva */
+    public void alterarReserva(Reserva reserva, LocalDateTime novaDataHora, boolean ignorarAviso) {
         LocalDateTime agora = LocalDateTime.now();
         if (novaDataHora.isBefore(agora)) {
             throw new IllegalArgumentException("A reserva precisa ser para um horário futuro.");
@@ -323,7 +475,7 @@ public class GeeksModel {
             ReservaDAO.Linha atual = reservaDAO.travar(c, reserva.getIdReserva());
             long duracao = ChronoUnit.MINUTES.between(atual.inicio, atual.fim);
             LocalDateTime novoFim = novaDataHora.plusMinutes(duracao);
-            verificarConflito(c, reserva.getDispositivo(), reserva.getIdReserva(), novaDataHora, novoFim, agora);
+            verificarConflito(c, reserva.getDispositivo(), reserva.getIdReserva(), novaDataHora, novoFim, agora, ignorarAviso);
             reservaDAO.alterarHorario(c, reserva.getIdReserva(), novaDataHora, novoFim);
             return null;
         });
@@ -335,13 +487,21 @@ public class GeeksModel {
     }
 
     private void verificarConflito(Connection c, Dispositivo d, int idIgnorar, LocalDateTime ini, LocalDateTime fim,
-                                   LocalDateTime agora) throws SQLException {
+                                   LocalDateTime agora, boolean ignorarAviso) throws SQLException {
         if (reservaDAO.conflitos(c, d.getIdEquipamento(), idIgnorar, ini, fim, Regras.JANELA_MINUTOS) > 0) {
-            throw new IllegalStateException("Esse dispositivo já tem reserva em um horário próximo (mínimo de 1 hora de intervalo).");
+            throw new IllegalStateException("Esse dispositivo já tem reserva em um horário próximo (mínimo de "
+                    + Regras.JANELA_MINUTOS + " minutos de intervalo).");
         }
-        if (ini.isBefore(agora.plusMinutes(Regras.JANELA_MINUTOS)) && reservaDAO.sessaoAbertaEmAndamento(c, d.getIdEquipamento())) {
+        Optional<LocalDateTime> fechadaAte = reservaDAO.sessaoFechadaAte(c, d.getIdEquipamento());
+        if (fechadaAte.isPresent() && ini.isBefore(fechadaAte.get().plusMinutes(Regras.JANELA_MINUTOS))) {
             List<String> livres = equipamentoDAO.livresMesmoTipo(c, d.getIdEquipamento(), ini, fim, agora, Regras.JANELA_MINUTOS);
-            throw new IllegalStateException("O dispositivo " + d.getNome() + " está em uso sem hora para acabar." + sugestao(livres));
+            throw new IllegalStateException("O dispositivo " + d.getNome() + " está em uso até "
+                    + fechadaAte.get().toLocalTime() + "." + sugestao(livres));
+        }
+        if (!ignorarAviso && ini.isBefore(agora.plusMinutes(Regras.JANELA_MINUTOS))
+                && reservaDAO.sessaoAbertaEmAndamento(c, d.getIdEquipamento())) {
+            List<String> livres = equipamentoDAO.livresMesmoTipo(c, d.getIdEquipamento(), ini, fim, agora, Regras.JANELA_MINUTOS);
+            throw new AvisoReserva("O dispositivo " + d.getNome() + " está em uso sem hora para acabar." + sugestao(livres));
         }
     }
 
