@@ -26,17 +26,23 @@ public final class Dialogos {
 
     // ---------- Formulários ----------
 
-    /** Retorna {Cliente, Dispositivo} ou null se o usuário cancelar. */
+    /** Retorna {Cliente, Dispositivo, Integer minutos (null = livre)} ou null se o usuário cancelar. */
     public static Object[] pedirNovaSessao(Component pai, List<Cliente> clientes, List<Dispositivo> dispositivos,
                                            Predicate<Dispositivo> ocupado) {
         FormNovaSessao form = new FormNovaSessao(clientes, dispositivos, ocupado);
-        return exibir(pai, "Nova sessão", form) ? new Object[]{form.getCliente(), form.getDispositivo()} : null;
+        return exibir(pai, "Nova sessão", form) ? new Object[]{form.getCliente(), form.getDispositivo(), form.getMinutos()} : null;
     }
 
-    /** Retorna {Cliente, Dispositivo, LocalTime} ou null se o usuário cancelar. */
-    public static Object[] pedirReserva(Component pai, List<Cliente> clientes, List<Dispositivo> dispositivos, LocalDate dia) {
-        FormReserva form = new FormReserva(clientes, dispositivos, dia);
-        return exibir(pai, "Registrar reserva", form) ? new Object[]{form.getCliente(), form.getDispositivo(), form.getHora()} : null;
+    /**
+     * Retorna {Cliente, Dispositivo, LocalTime, Integer minutos, String formaEntrada (null = não pagou)}
+     * ou null se o usuário cancelar.
+     */
+    public static Object[] pedirReserva(Component pai, List<Cliente> clientes, List<Dispositivo> dispositivos, LocalDate dia,
+                                        List<String> formas) {
+        FormReserva form = new FormReserva(clientes, dispositivos, dia, formas);
+        return exibir(pai, "Registrar reserva", form)
+                ? new Object[]{form.getCliente(), form.getDispositivo(), form.getHora(), form.getMinutos(), form.getFormaEntrada()}
+                : null;
     }
 
     public static LocalTime pedirHorario(Component pai, LocalTime atual) {
@@ -64,8 +70,18 @@ public final class Dialogos {
 
     // ---------- Confirmações e avisos ----------
 
-    public static boolean confirmarEncerramento(Component pai, Sessao sessao) {
-        return exibir(pai, "Encerrar sessão", new FormEncerrarSessao(sessao));
+    /** Formulário confirmado (forma de pagamento e uso do crédito), ou null se cancelar. */
+    public static FormEncerrarSessao confirmarEncerramento(Component pai, Sessao sessao, List<String> formas,
+                                                           java.util.function.Function<Boolean, geeks.model.PreviaEncerramento> previa) {
+        FormEncerrarSessao form = new FormEncerrarSessao(sessao, formas, previa);
+        return exibir(pai, "Encerrar sessão", form) ? form : null;
+    }
+
+    /** Escolha da forma de pagamento de um valor (ex.: mensalidade do Clube). Retorna a forma ou null. */
+    public static String pedirPagamento(Component pai, String titulo, String descricao, java.math.BigDecimal valor,
+                                        List<String> formas, String textoConfirmar) {
+        FormPagamento form = new FormPagamento(titulo, descricao, valor, formas, textoConfirmar);
+        return exibir(pai, titulo, form) ? form.getForma() : null;
     }
 
     /** destrutivo = true usa o tom de alerta (vermelho), por exemplo para cancelamentos. */

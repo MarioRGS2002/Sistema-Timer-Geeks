@@ -13,10 +13,13 @@ import java.awt.event.ActionListener;
 
 public class PainelCadastro extends PainelPagina {
     private final CampoGeeks campoNome = new CampoGeeks("Nome completo");
-    private final CampoGeeks campoIdade = new CampoGeeks("Idade");
+    private final CampoGeeks campoNascimento = new CampoGeeks("dd/mm/aaaa");
     private final CampoGeeks campoTelefone = new CampoGeeks("(00) 00000-0000");
     private final CampoGeeks campoCpf = new CampoGeeks("000.000.000-00");
     private final CampoGeeks campoResponsavel = new CampoGeeks("Nome do responsável");
+    private final CampoGeeks campoParentesco = new CampoGeeks("Mãe, pai, tio...");
+    private final CampoGeeks campoCpfResponsavel = new CampoGeeks("000.000.000-00");
+    private final CampoGeeks campoTelefoneResponsavel = new CampoGeeks("(00) 00000-0000");
     private final CaixaMarcacao chkPlano = new CaixaMarcacao("Assinar o Clube Geeks depois de salvar");
     private final BotaoGeeks btSalvar = new BotaoGeeks("Salvar cadastro", Icone.Tipo.CHECK, BotaoGeeks.Estilo.PREENCHIDO);
     private final BotaoGeeks btLimpar = new BotaoGeeks("Limpar campos", null, BotaoGeeks.Estilo.CONTORNO);
@@ -29,13 +32,13 @@ public class PainelCadastro extends PainelPagina {
         form.setLayout(new BorderLayout(0, 14));
         form.setBorder(new EmptyBorder(22, 22, 22, 22));
         JPanel campos = Componentes.transparente(new GridLayout(0, 1, 0, 12));
-        JPanel linha = Componentes.transparente(new GridLayout(1, 2, 16, 0));
-        linha.add(comRotulo("Idade", campoIdade));
-        linha.add(comRotulo("Telefone", campoTelefone));
         campos.add(comRotulo("Nome", campoNome));
-        campos.add(linha);
+        campos.add(dupla(comRotulo("Data de nascimento", campoNascimento), comRotulo("Telefone", campoTelefone)));
         campos.add(comRotulo("CPF", campoCpf));
-        campos.add(comRotulo("Responsável (opcional, obrigatório para menores de 18)", campoResponsavel));
+        campos.add(dupla(comRotulo("Responsável (obrigatório para menores de 18)", campoResponsavel),
+                comRotulo("Parentesco", campoParentesco)));
+        campos.add(dupla(comRotulo("CPF do responsável", campoCpfResponsavel),
+                comRotulo("Telefone do responsável", campoTelefoneResponsavel)));
         JPanel envoltorio = Componentes.transparente(new BorderLayout());
         envoltorio.add(campos, BorderLayout.NORTH);
         JPanel rodape = Componentes.transparente(new BorderLayout());
@@ -49,6 +52,13 @@ public class PainelCadastro extends PainelPagina {
         corpo.add(form);
         corpo.add(criarCartaoClube());
         getCorpo().add(corpo, BorderLayout.CENTER);
+    }
+
+    private JPanel dupla(JPanel esquerda, JPanel direita) {
+        JPanel linha = Componentes.transparente(new GridLayout(1, 2, 16, 0));
+        linha.add(esquerda);
+        linha.add(direita);
+        return linha;
     }
 
     private JPanel comRotulo(String rotulo, CampoGeeks campo) {
@@ -86,8 +96,20 @@ public class PainelCadastro extends PainelPagina {
         return campoNome.getText();
     }
 
-    public String getIdade() {
-        return campoIdade.getText();
+    public String getNascimento() {
+        return campoNascimento.getText();
+    }
+
+    public String getParentesco() {
+        return campoParentesco.getText();
+    }
+
+    public String getCpfResponsavel() {
+        return campoCpfResponsavel.getText();
+    }
+
+    public String getTelefoneResponsavel() {
+        return campoTelefoneResponsavel.getText();
     }
 
     public String getTelefone() {
@@ -108,10 +130,13 @@ public class PainelCadastro extends PainelPagina {
 
     public void limparCampos() {
         campoNome.setText("");
-        campoIdade.setText("");
+        campoNascimento.setText("");
         campoTelefone.setText("");
         campoCpf.setText("");
         campoResponsavel.setText("");
+        campoParentesco.setText("");
+        campoCpfResponsavel.setText("");
+        campoTelefoneResponsavel.setText("");
         chkPlano.setSelected(false);
     }
 

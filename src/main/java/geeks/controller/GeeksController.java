@@ -7,6 +7,9 @@ import geeks.model.Funcionario;
 import geeks.model.FuncionariosModel;
 import geeks.model.Perfil;
 import geeks.view.FormFuncionario;
+import geeks.view.FormEncerrarSessao;
+import geeks.model.PreviaEncerramento;
+import geeks.model.AvisoReserva;
 import geeks.model.GeeksModel;
 import geeks.model.PeriodoFaturamento;
 import geeks.model.SerieFaturamento;
@@ -282,9 +285,10 @@ public class GeeksController {
             return;
         }
         try {
-            model.iniciarSessao((Cliente) r[0], (Dispositivo) r[1]);
+            model.iniciarSessao((Cliente) r[0], (Dispositivo) r[1], (Integer) r[2]);
             atualizarSessoes();
-        } catch (IllegalStateException ex) {
+            atualizarReservas(); // a reserva do cliente pode ter virado esta sessão
+        } catch (IllegalArgumentException | IllegalStateException ex) {
             Dialogos.erro(view, ex.getMessage());
         }
     }
@@ -294,14 +298,29 @@ public class GeeksController {
         if (sessao == null) {
             return;
         }
-        if (Dialogos.confirmarEncerramento(view, sessao)) {
-            // o cartão some com animação e só então a sessão é encerrada e as telas atualizadas
-            view.getPainelSessoes().animarSaida(id, () -> {
-                model.encerrarSessao(id);
+        FormEncerrarSessao form = Dialogos.confirmarEncerramento(view, sessao, model.getFormasPagamento(),
+                usarCredito -> model.previaEncerramento(id, usarCredito));
+        if (form == null) {
+            return;
+        }
+        String forma = form.getFormaPagamento();
+        boolean usarCredito = form.isUsarCredito();
+        // o cartão some com animação e só então a sessão é encerrada e as telas atualizadas
+        view.getPainelSessoes().animarSaida(id, () -> {
+            try {
+                PreviaEncerramento r = model.encerrarSessao(id, forma, usarCredito);
+                if (r.getCobranca().getMinutosCredito() > 0) {
+                    Dialogos.sucesso(view, sessao.getCliente().getNome() + " ficou com " + r.getCobranca().getMinutosCredito()
+                            + " min de crédito em " + sessao.getDispositivo().getTipo().getRotulo()
+                            + " (vale 3 meses). Dá para usar ao encerrar a próxima sessão.");
+                }
+            } catch (IllegalArgumentException | IllegalStateException ex) {
+                Dialogos.erro(view, ex.getMessage());
+            } finally {
                 atualizarSessoes();
                 atualizarHistorico();
-            });
-        }
+            }
+        });
     }
 
     // ---------- Reservas ----------
@@ -311,15 +330,32 @@ public class GeeksController {
             Dialogos.info(view, "Cadastre um cliente antes de registrar uma reserva.");
             return;
         }
-        Object[] r = Dialogos.pedirReserva(view, model.getClientes(), model.getDispositivos(), diaSelecionado);
+        Object[] r = Dialogos.pedirReserva(view, model.getClientes(), model.getDispositivos(), diaSelecionado,
+                model.getFormasPagamento());
         if (r == null) {
             return;
         }
-        try {
-            model.registrarReserva((Cliente) r[0], (Dispositivo) r[1], LocalDateTime.of(diaSelecionado, (LocalTime) r[2]));
-            atualizarReservas();
-        } catch (IllegalArgumentException | IllegalStateException ex) {
-            Dialogos.erro(view, ex.getMessage());
+        LocalDateTime quando = LocalDateTime.of(diaSelecionado, (LocalTime) r[2]);
+        boolean ignorarAviso = false;
+        while (true) {
+            try {
+                model.registrarReserva((Cliente) r[0], (Dispositivo) r[1], quando, (Integer) r[3], (String) r[4], ignorarAviso);
+                atualizarReservas();
+                if (r[4] != null) {
+                    Dialogos.sucesso(view, "Reserva registrada com a entrada paga em " + r[4] + ".");
+                }
+                return;
+            } catch (AvisoReserva aviso) {
+                if (!Dialogos.confirmar(view, "Reservar mesmo assim?", aviso.getMessage()
+                        + " Se reservar, combine com o cliente atual para liberar o equipamento antes do horário.",
+                        "Reservar mesmo assim", false)) {
+                    return;
+                }
+                ignorarAviso = true;
+            } catch (IllegalArgumentException | IllegalStateException ex) {
+                Dialogos.erro(view, ex.getMessage());
+                return;
+            }
         }
     }
 
@@ -345,11 +381,21 @@ public class GeeksController {
         if (novo == null) {
             return;
         }
-        try {
-            model.alterarReserva(r, LocalDateTime.of(diaSelecionado, novo));
-            atualizarReservas();
-        } catch (IllegalArgumentException | IllegalStateException ex) {
-            Dialogos.erro(view, ex.getMessage());
+        boolean ignorarAviso = false;
+        while (true) {
+            try {
+                model.alterarReserva(r, LocalDateTime.of(diaSelecionado, novo), ignorarAviso);
+                atualizarReservas();
+                return;
+            } catch (AvisoReserva aviso) {
+                if (!Dialogos.confirmar(view, "Alterar mesmo assim?", aviso.getMessage(), "Alterar mesmo assim", false)) {
+                    return;
+                }
+                ignorarAviso = true;
+            } catch (IllegalArgumentException | IllegalStateException ex) {
+                Dialogos.erro(view, ex.getMessage());
+                return;
+            }
         }
     }
 
@@ -381,10 +427,10 @@ public class GeeksController {
         if (clienteDoClube == null) {
             return;
         }
-        String msg = "Assinar o " + plano.getNome() + " (" + Formatador.moeda(plano.getValor())
-                + ") para " + clienteDoClube.getNome() + "?";
-        if (Dialogos.confirmar(view, "Assinar clube", msg, "Assinar", false)) {
-            model.assinarPlano(clienteDoClube, plano);
+        String msg = "Mensalidade do " + plano.getNome() + " para " + clienteDoClube.getNome() + ".";
+        String forma = Dialogos.pedirPagamento(view, "Assinar clube", msg, plano.getValor(), model.getFormasPagamento(), "Assinar");
+        if (forma != null) {
+            model.assinarPlano(clienteDoClube, plano, forma);
             view.getPainelClube().mostrarCliente(clienteDoClube);
             Dialogos.sucesso(view, clienteDoClube.getNome() + " agora faz parte do Clube Geeks!");
         }
@@ -405,9 +451,9 @@ public class GeeksController {
 
     private void salvarCadastro() {
         try {
-            Cliente novo = model.cadastrarCliente(view.getPainelCadastro().getNome(), view.getPainelCadastro().getIdade(),
-                    view.getPainelCadastro().getTelefone(), view.getPainelCadastro().getCpf(),
-                    view.getPainelCadastro().getResponsavel());
+            var p = view.getPainelCadastro();
+            Cliente novo = model.cadastrarCliente(p.getNome(), p.getNascimento(), p.getTelefone(), p.getCpf(),
+                    p.getResponsavel(), p.getCpfResponsavel(), p.getTelefoneResponsavel(), p.getParentesco());
             boolean escolherPlano = view.getPainelCadastro().isEscolherPlano();
             view.getPainelCadastro().limparCampos();
             Dialogos.sucesso(view, "Cliente " + novo.getNome() + " cadastrado com sucesso!");

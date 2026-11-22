@@ -30,14 +30,22 @@ public class CaixaMarcacao extends JCheckBox {
     private boolean passando;
     private Timer timer;
 
+    private final boolean escuro;
+
     public CaixaMarcacao(String texto) {
+        this(texto, false);
+    }
+
+    /** @param fundoEscuro true para usar sobre o fundo preto (texto branco, caixa amarela, check preto) */
+    public CaixaMarcacao(String texto, boolean fundoEscuro) {
         super(texto);
+        this.escuro = fundoEscuro;
         setOpaque(false);
         setContentAreaFilled(false);
         setBorderPainted(false);
         setFocusPainted(false);
         setFont(Tema.fonte(Font.BOLD, 15));
-        setForeground(Tema.FUNDO);
+        setForeground(fundoEscuro ? Tema.BRANCO : Tema.FUNDO);
         setBorder(new EmptyBorder(8, 10, 8, 14));
         setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         marca = isSelected() ? 1f : 0f;
@@ -95,11 +103,11 @@ public class CaixaMarcacao extends JCheckBox {
 
         // realce discreto ao passar o mouse e anel de foco para o teclado
         if (passando) {
-            g.setColor(new Color(13, 13, 13, 18));
+            g.setColor(escuro ? new Color(255, 255, 255, 14) : new Color(13, 13, 13, 18));
             g.fillRoundRect(0, 0, w, h, 18, 18);
         }
         if (isFocusOwner()) {
-            g.setColor(new Color(13, 13, 13, 110));
+            g.setColor(escuro ? new Color(255, 214, 10, 120) : new Color(13, 13, 13, 110));
             g.setStroke(new BasicStroke(2f));
             g.drawRoundRect(1, 1, w - 3, h - 3, 18, 18);
         }
@@ -111,9 +119,9 @@ public class CaixaMarcacao extends JCheckBox {
         double escala = 1 + 0.10 * pulso;
         c.scale(escala, escala);
         c.translate(-LADO / 2.0, -LADO / 2.0);
-        c.setColor(new Color(13, 13, 13, (int) (255 * marca)));
+        c.setColor(escuro ? new Color(255, 214, 10, (int) (255 * marca)) : new Color(13, 13, 13, (int) (255 * marca)));
         c.fillRoundRect(0, 0, LADO, LADO, 9, 9);
-        c.setColor(Tema.FUNDO);
+        c.setColor(escuro ? Tema.AMARELO : Tema.FUNDO);
         c.setStroke(new BasicStroke(2.2f));
         c.drawRoundRect(1, 1, LADO - 2, LADO - 2, 9, 9);
         desenharCheck(c, marca);
@@ -146,7 +154,7 @@ public class CaixaMarcacao extends JCheckBox {
             double t = (restante - l1) / l2;
             caminho.lineTo(pts[1][0] + (pts[2][0] - pts[1][0]) * t, pts[1][1] + (pts[2][1] - pts[1][1]) * t);
         }
-        g.setColor(Tema.AMARELO);
+        g.setColor(escuro ? Tema.FUNDO : Tema.AMARELO);
         g.setStroke(new BasicStroke(2.8f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
         g.draw(caminho);
     }

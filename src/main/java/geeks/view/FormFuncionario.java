@@ -18,7 +18,7 @@ public class FormFuncionario extends FormularioGeeks {
     private final CampoGeeks campoLogin = new CampoGeeks("ex.: maria");
     private final SenhaGeeks campoSenha = new SenhaGeeks("Mínimo " + SENHA_MINIMA + " caracteres");
     private final SenhaGeeks campoConfirmacao = new SenhaGeeks("Repita a senha");
-    private final CaixaMarcacao chkGerente = new CaixaMarcacao("É gerente (vê o faturamento e gerencia funcionários)");
+    private final CaixaMarcacao chkGerente = new CaixaMarcacao("É gerente (vê o faturamento e gerencia funcionários)", true);
     private final boolean soSenha;
 
     /** Cadastro completo. */
