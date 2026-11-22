@@ -185,29 +185,27 @@ powershell -ExecutionPolicy Bypass -File db\backup\agendar_backup.ps1      # tod
 - Limitação: o MySQL não sabe quem é o funcionário logado (todos usam o `geeks_app`), então a diferença
   entre ATENDENTE e GERENTE é garantida pela aplicação, não pelo banco.
 
-## Pendências que dependem do front
+## Pendências que dependiam do front (todas resolvidas)
 
-A integração com o banco foi feita **sem alterar as telas existentes** (a única tela nova é Funcionários, pedida depois). Onde a tela não tem um campo que o banco precisa,
-o sistema usa um padrão provisório:
-
-| # | Tela | Falta na tela | O que o sistema faz hoje |
-|---|---|---|---|
-| 1 | Encerrar sessão / Clube | escolher a forma de pagamento | grava tudo como **Dinheiro** (`geeks.formaPagamentoPadrao`) |
-| 2 | Cadastro de cliente | data de nascimento (a tela pede a **idade**) | grava nascimento = hoje − idade (dia/mês aproximados) |
-| 3 | Cadastro de cliente (menor) | CPF e telefone do responsável | o responsável **não é gravado** (o banco exige CPF). A view `vw_menor_sem_responsavel` lista esses clientes |
-| 4 | Nova sessão | escolher tempo ABERTO ou FECHADO (e o horário previsto) | toda sessão começa como **ABERTO** (mínimo 1 hora; o que sobrar vira crédito) |
-| 5 | Encerrar / nova sessão | usar o crédito de tempo do cliente | o crédito é gerado e guardado (3 meses), mas **não há como usar** |
-| 6 | Nova reserva | horário de fim | toda reserva dura **60 min** (`geeks.duracaoReservaMinutos`) |
-| 7 | Nova reserva | registrar o pagamento da entrada | o valor da entrada (50%) é calculado e guardado na reserva, mas **nenhum pagamento é lançado** |
-| 8 | Nova reserva | aviso "há sessão aberta nesse equipamento" com opção de continuar | aparece como **erro** e a reserva não é feita; a mensagem sugere outro equipamento livre do mesmo tipo |
-| 9 | Encerrar sessão | mostrar hora grátis usada e crédito gerado | são gravados no banco; a confirmação de encerramento mostra só o valor |
-| 10 | ~~Funcionários~~ | ~~cadastro/troca de senha pela tela~~ | **resolvido**: tela Funcionários (só gerente) |
-
+| # | Tela | O que foi feito |
+|---|---|---|
+| 1 | Encerrar sessão, Clube e reserva | a tela pergunta a **forma de pagamento** (Dinheiro, PIX, Débito, Crédito, lidas da tabela `forma_pagamento`) |
+| 2 | Cadastro de cliente | **data de nascimento** (dd/mm/aaaa ou só os 8 números), no lugar da idade |
+| 3 | Cadastro de cliente | **responsável** com nome, parentesco, CPF e telefone, gravado na tabela `responsavel`; obrigatório para menores de 18 |
+| 4 | Nova sessão | escolha de **tempo livre** (mínimo 1 h) ou **fechado** (30 min a 4 h, com horário previsto) |
+| 5 | Encerrar sessão | opção **usar crédito do cliente** (do mesmo tipo de equipamento); abate do crédito que vence primeiro e fica registrado em `participante_sessao.segundos_credito` (migration V5) |
+| 6 | Nova reserva | escolha da **duração** (30 min a 4 h) |
+| 7 | Nova reserva | **entrada paga na hora** com forma de pagamento: lança o pagamento e a reserva fica CONFIRMADA. Quando o cliente chega e a sessão é aberta no equipamento reservado, a reserva **vira a sessão** (tempo fechado até o fim da reserva) e a entrada é **descontada** no encerramento |
+| 8 | Nova reserva | o aviso "equipamento em uso sem hora para acabar" virou pergunta **"Reservar mesmo assim?"** (sugere outro equipamento livre do mesmo tipo). Sessão de tempo fechado bloqueia reservas antes do fim + folga |
+| 9 | Encerrar sessão | a confirmação mostra **hora grátis do Clube, crédito usado, entrada já paga e crédito que sobra**; ao encerrar com sobra de crédito aparece um aviso |
+| 10 | Funcionários | tela **Funcionários** (só gerente) |
 ## Decisões a confirmar com a loja
 
 - Depois da 1ª hora, o tempo ABERTO é cobrado proporcional ao uso (por segundo, arredondado ao centavo).
 - Sessão aberta e encerrada no mesmo instante (engano) não cobra nada.
 - Hora grátis do Clube conta pelo dia em que a sessão **começou** (sessão que cruza a meia-noite usa a do dia do início).
+- Cancelar uma reserva com entrada paga não devolve a entrada pelo sistema (devolução, se houver, é feita por fora).
+- Se a entrada paga for maior que o valor final da sessão, a diferença não vira troco nem crédito.
 - Destino do backup: hoje `C:\GeeksBackup`, no mesmo disco. O recomendado é um HD externo ou outro computador.
 
 ## Interface (notas do front)

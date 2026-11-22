@@ -19,6 +19,7 @@ A estrutura é criada pelas migrations em `src/main/resources/db/migration`, apl
 | V2 `movimento` | assinatura_clube, sessao, participante_sessao, reserva, pagamento, credito_tempo, view `vw_menor_sem_responsavel` |
 | V3 `dados_base` | tipos (PC, PlayStation, Nintendo Switch, Xadrez — R$ 10,00/h), Clube Geeks (R$ 180,00), formas de pagamento |
 | V4 `permissao_delete_reserva` | `GRANT DELETE ON reserva TO geeks_app` |
+| V5 `credito_usado` | `participante_sessao.segundos_credito`: crédito de tempo usado em cada sessão |
 
 Regras:
 - **Nunca edite uma migration já aplicada** (o Flyway recusa: `validateOnMigrate`). Mudança de estrutura = novo arquivo `V5__descricao.sql`.
