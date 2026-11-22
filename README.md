@@ -24,7 +24,11 @@ No computador da loja não precisa de Java, Maven, Git nem PowerShell:
    os equipamentos da loja e se quer backup automático diário (pasta e horário).
 5. Pronto: o sistema abre pelo atalho **"Sistema Geeks"** na área de trabalho.
 
-Para cadastrar mais funcionários ou equipamentos depois, abra o configurador de novo (ele mantém o que já existe).
+Funcionários: depois que o gerente existe, ele mesmo cuida da equipe pela tela **Funcionários** do sistema
+(só aparece para gerente): cadastra atendentes ou outros gerentes, troca senha (funcionário que esqueceu)
+e desativa/reativa. Ninguém consegue desativar o próprio acesso e sempre sobra pelo menos um gerente ativo.
+Desativar não apaga: o funcionário só deixa de entrar, e o histórico continua com o nome dele.
+Equipamentos novos: abra o configurador de novo (ele mantém o que já existe).
 A configuração fica em `C:\ProgramData\SistemaGeeks` (legível só pelo usuário do Windows que rodou o configurador:
 use o mesmo usuário do Windows para o configurador e para o sistema).
 
@@ -156,8 +160,8 @@ powershell -ExecutionPolicy Bypass -File db\backup\agendar_backup.ps1      # tod
       README.md                     detalhes do banco
     src/main/java/geeks/
       MainGeeks.java                ponto de entrada: migrations -> pool -> login
-      view/                         telas (Swing) — NÃO alteradas pela integração com o banco
-      controller/                   liga telas e model — NÃO alterado
+      view/                         telas (Swing); a integração com o banco não mudou as telas existentes; nova: PainelFuncionarios/FormFuncionario
+      controller/                   liga telas e model (acrescentada só a tela Funcionários)
       model/                        regras de negócio (GeeksModel, Cobranca, LoginModel, FaturamentoModel...)
                                     Contexto guarda o funcionário logado e barra o que exige GERENTE
       dados/                        acesso ao MySQL: Banco (Flyway + pool), Transacao, Sql, *DAO, ErroBanco
@@ -174,6 +178,8 @@ powershell -ExecutionPolicy Bypass -File db\backup\agendar_backup.ps1      # tod
 - Senhas de funcionários com BCrypt (custo 11); login com usuário inexistente gasta o mesmo tempo que senha errada.
 - Funcionário inativo (`ativo = 0`) não entra.
 - Faturamento: a regra "só GERENTE" é checada no model (`Contexto.exigirGerente()`), não só escondendo a tela.
+- Funcionários: além disso, cada ação confere no banco se quem está logado ainda é gerente ativo
+  (um gerente desativado em outro computador perde o acesso na hora, mesmo com o sistema aberto).
 - O banco recusa dados inválidos mesmo que o sistema tente gravar (CHECKs, chaves únicas, chaves estrangeiras).
 - O usuário do sistema (`geeks_app`) não consegue apagar clientes, sessões ou pagamentos, nem alterar a estrutura.
 - Limitação: o MySQL não sabe quem é o funcionário logado (todos usam o `geeks_app`), então a diferença
@@ -181,7 +187,7 @@ powershell -ExecutionPolicy Bypass -File db\backup\agendar_backup.ps1      # tod
 
 ## Pendências que dependem do front
 
-A integração foi feita **sem alterar nenhuma tela**. Onde a tela não tem um campo que o banco precisa,
+A integração com o banco foi feita **sem alterar as telas existentes** (a única tela nova é Funcionários, pedida depois). Onde a tela não tem um campo que o banco precisa,
 o sistema usa um padrão provisório:
 
 | # | Tela | Falta na tela | O que o sistema faz hoje |
@@ -195,7 +201,7 @@ o sistema usa um padrão provisório:
 | 7 | Nova reserva | registrar o pagamento da entrada | o valor da entrada (50%) é calculado e guardado na reserva, mas **nenhum pagamento é lançado** |
 | 8 | Nova reserva | aviso "há sessão aberta nesse equipamento" com opção de continuar | aparece como **erro** e a reserva não é feita; a mensagem sugere outro equipamento livre do mesmo tipo |
 | 9 | Encerrar sessão | mostrar hora grátis usada e crédito gerado | são gravados no banco; a confirmação de encerramento mostra só o valor |
-| 10 | Funcionários | cadastro/troca de senha pela tela | feito pela ferramenta `geeks.tools.CriarUsuario` |
+| 10 | ~~Funcionários~~ | ~~cadastro/troca de senha pela tela~~ | **resolvido**: tela Funcionários (só gerente) |
 
 ## Decisões a confirmar com a loja
 
