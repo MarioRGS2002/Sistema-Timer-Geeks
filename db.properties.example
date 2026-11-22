@@ -1,0 +1,25 @@
+# Conexão com o MySQL do Sistema Geeks.
+# Copie para "db.properties" (na mesma pasta do pom.xml ou ao lado do sistema-geeks.jar)
+# e troque as senhas. O db.properties NÃO vai para o Git (.gitignore).
+#
+# Se aparecer "Public Key Retrieval is not allowed": o MySQL está sem SSL e o
+# usuário usa caching_sha2_password. Prefira deixar o SSL ligado no servidor;
+# em último caso, acrescente &allowPublicKeyRetrieval=true ao final da URL.
+#
+# Fuso: -03:00 fixo (horário de Brasília, sem horário de verão desde 2019).
+# "America/Sao_Paulo" só funciona se as tabelas de fuso do MySQL estiverem
+# carregadas, o que não vem por padrão no Windows ("Unknown or incorrect time zone").
+
+db.url=jdbc:mysql://localhost:3306/geeks?useUnicode=true&characterEncoding=utf8&connectionTimeZone=-03:00&forceConnectionTimeZoneToSession=true
+
+# Usado só pelo Flyway na inicialização (cria/atualiza tabelas)
+db.migrator.usuario=geeks_migrator
+db.migrator.senha=TROQUE_PELA_SENHA_DO_MIGRATOR
+
+# Usado pelo sistema no dia a dia (sem DDL, DELETE só em reserva)
+db.app.usuario=geeks_app
+db.app.senha=TROQUE_PELA_SENHA_DO_APP
+
+# Pool de conexões (HikariCP): 2 a 5 conexões
+db.pool.minimo=2
+db.pool.maximo=5
