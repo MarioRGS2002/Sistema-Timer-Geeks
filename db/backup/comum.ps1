@@ -2,8 +2,20 @@
 $ErrorActionPreference = 'Stop'
 $Script:PastaBackup = $PSScriptRoot
 $Script:Raiz = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
-$Script:Cnf = Join-Path $PSScriptRoot 'backup.cnf'
-$Script:ArquivoSenha = Join-Path $PSScriptRoot 'senha-backup.txt'
+# Onde ficam db.properties, backup.cnf e senha-backup.txt:
+#  - sistema instalado (Configurar Sistema Geeks): %ProgramData%\SistemaGeeks
+#  - desenvolvimento: db.properties na raiz do projeto e os outros dois nesta pasta
+$Script:PastaLoja = Join-Path $env:ProgramData 'SistemaGeeks'
+if ($env:GEEKS_CONFIG_DIR) { $Script:PastaLoja = $env:GEEKS_CONFIG_DIR }
+if (Test-Path (Join-Path $Script:Raiz 'db.properties')) {
+    $Script:DbProperties = Join-Path $Script:Raiz 'db.properties'
+    $Script:PastaSegredos = $PSScriptRoot
+} else {
+    $Script:DbProperties = Join-Path $Script:PastaLoja 'db.properties'
+    $Script:PastaSegredos = $Script:PastaLoja
+}
+$Script:Cnf = Join-Path $Script:PastaSegredos 'backup.cnf'
+$Script:ArquivoSenha = Join-Path $Script:PastaSegredos 'senha-backup.txt'
 
 function Ler-Propriedades([string]$arquivo) {
     if (-not (Test-Path $arquivo)) { throw "Arquivo não encontrado: $arquivo" }

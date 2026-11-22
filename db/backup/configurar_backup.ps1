@@ -1,8 +1,9 @@
 ﻿# ============================================================
 # GEEKS - prepara o backup (rodar uma vez)
 # ============================================================
-# Cria, nesta pasta (db\backup), os dois arquivos que o backup usa e que NÃO vão
-# para o Git (.gitignore):
+# Cria os dois arquivos que o backup usa (em desenvolvimento ficam nesta pasta,
+# db\backup, e não vão para o Git; no sistema instalado ficam em
+# C:\ProgramData\SistemaGeeks, junto do db.properties):
 #   backup.cnf        usuário/senha do MySQL (geeks_migrator, lidos do db.properties)
 #   senha-backup.txt  senha de criptografia dos arquivos .7z (gerada aleatória)
 # Os dois ficam legíveis só pelo seu usuário do Windows.
@@ -21,7 +22,7 @@ $utf8 = New-Object Text.UTF8Encoding($false)
 if ((Test-Path $Script:Cnf) -and -not $Recriar) {
     Write-Host "backup.cnf já existe (use -Recriar para refazer)."
 } else {
-    $p = Ler-Propriedades (Join-Path $Script:Raiz 'db.properties')
+    $p = Ler-Propriedades $Script:DbProperties
     $usuario = $p['db.migrator.usuario']
     $senha = $p['db.migrator.senha']
     if (-not $usuario -or -not $senha -or $senha -like 'TROQUE*') { throw 'Preencha db.migrator.usuario e db.migrator.senha no db.properties.' }
