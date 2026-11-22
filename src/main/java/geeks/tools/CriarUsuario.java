@@ -61,16 +61,9 @@ public final class CriarUsuario {
         }
     }
 
+    /** Mesma regra da tela Funcionários (FuncionariosModel). */
     static void validar(String login, String nome, String cargo) {
-        if (!login.matches("[a-z0-9._-]{3,50}")) {
-            throw new IllegalArgumentException("Login inválido: use de 3 a 50 letras minúsculas, números, ponto, _ ou -.");
-        }
-        if (nome == null || nome.isBlank() || nome.trim().length() > 100) {
-            throw new IllegalArgumentException("Informe um nome de até 100 caracteres.");
-        }
-        if (!cargo.equals("ATENDENTE") && !cargo.equals("GERENTE")) {
-            throw new IllegalArgumentException("Cargo deve ser ATENDENTE ou GERENTE.");
-        }
+        geeks.model.FuncionariosModel.validar(login, nome, cargo);
     }
 
     private static String ler(Console console, BufferedReader entrada, String rotulo) throws Exception {
