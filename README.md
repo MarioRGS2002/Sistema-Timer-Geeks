@@ -12,7 +12,34 @@ Interface em Java Swing; dados em MySQL (JDBC + HikariCP), com estrutura criada 
 | MySQL Server | 8.0.16+ (testado no 26.7) | banco de dados |
 | 7-Zip | qualquer recente | só para o backup criptografado |
 
-## Instalação (primeira vez)
+## Instalação na loja (instalador)
+
+No computador da loja não precisa de Java, Maven, Git nem PowerShell:
+
+1. Instale o **MySQL Server** (instalador oficial do MySQL; anote a senha do `root` que ele pedir).
+2. Instale o **7-Zip** (7-zip.org) — só para o backup automático.
+3. Rode o **`Sistema Geeks-1.0.0.exe`** (avançar, avançar, concluir).
+4. Abra **"Configurar Sistema Geeks"** no menu Iniciar (uma vez só). Ele pergunta, em ordem:
+   a senha do root do MySQL, o login/nome/senha do gerente (e outros funcionários),
+   os equipamentos da loja e se quer backup automático diário (pasta e horário).
+5. Pronto: o sistema abre pelo atalho **"Sistema Geeks"** na área de trabalho.
+
+Para cadastrar mais funcionários ou equipamentos depois, abra o configurador de novo (ele mantém o que já existe).
+A configuração fica em `C:\ProgramData\SistemaGeeks` (legível só pelo usuário do Windows que rodou o configurador:
+use o mesmo usuário do Windows para o configurador e para o sistema).
+
+### Gerar o instalador (desenvolvedor)
+
+```powershell
+powershell -ExecutionPolicy Bypass -File instalador\gerar_instalador.ps1 -Jdk "C:\Program Files\Eclipse Adoptium\jdk-25.0.3.9-hotspot"
+```
+
+Precisa de um JDK 17+ (com `jpackage`) e do WiX Toolset 3.14 (zip `wix314-binaries.zip` do GitHub oficial
+`wixtoolset/wix3`, extraído em `%USERPROFILE%\tools\wix314` ou informado com `-Wix`).
+Gera `target\instalador\Sistema Geeks-<versão>.exe` (~55 MB, já com o Java dentro).
+O script se recusa a empacotar arquivos com senha (`*.properties`, `backup.cnf`, `senha-backup.txt`).
+
+## Instalação para desenvolvimento
 
 Todos os comandos são no PowerShell, na pasta do projeto.
 
@@ -65,7 +92,8 @@ java -jar target\sistema-geeks.jar
 Ao abrir, o sistema aplica as migrations pendentes (Flyway) **antes** do login. Se o banco estiver fora do ar,
 a senha estiver errada ou uma migration falhar, aparece uma janela de erro e o sistema fecha (código de saída 2).
 
-O `db.properties` é procurado, nesta ordem: `-Dgeeks.db.config=C:\caminho\db.properties`, a pasta atual, a pasta do `.jar`.
+O `db.properties` é procurado, nesta ordem: `-Dgeeks.db.config=C:\caminho\db.properties`, a pasta atual, a pasta do `.jar`
+e `C:\ProgramData\SistemaGeeks` (sistema instalado).
 
 ### Dados de exemplo (só desenvolvimento)
 
@@ -133,7 +161,8 @@ powershell -ExecutionPolicy Bypass -File db\backup\agendar_backup.ps1      # tod
       model/                        regras de negócio (GeeksModel, Cobranca, LoginModel, FaturamentoModel...)
                                     Contexto guarda o funcionário logado e barra o que exige GERENTE
       dados/                        acesso ao MySQL: Banco (Flyway + pool), Transacao, Sql, *DAO, ErroBanco
-      tools/                        CriarUsuario, CarregarSeedDev
+      tools/                        ConfigurarLoja (assistente da loja), CriarUsuario, CarregarSeedDev
+    instalador/                     gerar_instalador.ps1 (jpackage + WiX -> .exe)
     src/main/resources/
       db/migration/                 V1..V4 (Flyway) — migration aplicada NUNCA é editada; mudança = nova V5...
       img/                          logos
