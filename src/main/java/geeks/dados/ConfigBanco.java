@@ -15,8 +15,9 @@ import java.util.Properties;
  * Configuração de conexão lida de um arquivo .properties (db.properties).
  * O arquivo fica FORA do Git; o modelo commitado é db.properties.example.
  *
- * <p>Procura, nesta ordem: a propriedade de sistema {@code geeks.db.config}, a pasta atual
- * e a pasta do sistema-geeks.jar.</p>
+ * <p>Procura, nesta ordem: a propriedade de sistema {@code geeks.db.config}, a pasta atual,
+ * a pasta do sistema-geeks.jar e a pasta da instalação na loja
+ * ({@code C:\ProgramData\SistemaGeeks}, criada pelo "Configurar Sistema Geeks").</p>
  */
 public final class ConfigBanco {
     private final String url;
@@ -57,13 +58,20 @@ public final class ConfigBanco {
             candidatos.add(pastaJar.resolve(nomeArquivo));
             candidatos.add(pastaJar.getParent() == null ? pastaJar.resolve(nomeArquivo) : pastaJar.getParent().resolve(nomeArquivo));
         }
+        candidatos.add(pastaInstalacao().resolve(nomeArquivo));
         for (Path c : candidatos) {
             if (Files.isRegularFile(c)) {
                 return deArquivo(c);
             }
         }
-        throw new ErroBanco("Arquivo de configuração do banco não encontrado (" + nomeArquivo + ").\n"
-                + "Copie " + nomeArquivo + ".example para " + nomeArquivo + " e preencha as senhas.");
+        throw new ErroBanco("O sistema ainda não foi configurado neste computador.\n"
+                + "Abra \"Configurar Sistema Geeks\" no menu Iniciar (uma vez só) e depois abra o sistema de novo.");
+    }
+
+    /** Pasta da configuração na loja: %ProgramData%\SistemaGeeks (fora da pasta do programa, que é só leitura). */
+    public static Path pastaInstalacao() {
+        String programData = System.getenv("ProgramData");
+        return Paths.get(programData == null || programData.isBlank() ? "C:\\ProgramData" : programData, "SistemaGeeks");
     }
 
     public static ConfigBanco deArquivo(Path arquivo) {
