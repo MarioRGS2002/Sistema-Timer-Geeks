@@ -49,6 +49,13 @@ public class ClienteDAO {
                 telefone == null || telefone.isBlank() ? null : telefone);
     }
 
+    public int inserirResponsavel(Connection c, int idCliente, String nome, String cpf, String telefone, String parentesco)
+            throws SQLException {
+        return Sql.inserir(c, "INSERT INTO responsavel (id_cliente, nome, cpf, telefone, parentesco) VALUES (?, ?, ?, ?, ?)",
+                idCliente, nome, cpf, telefone == null || telefone.isBlank() ? null : telefone,
+                parentesco == null || parentesco.isBlank() ? null : parentesco);
+    }
+
     private List<Cliente> listar(Connection c, String sql, Object... params) throws SQLException {
         List<Cliente> lista = new ArrayList<>();
         try (PreparedStatement ps = Sql.preparar(c, sql, params); ResultSet rs = ps.executeQuery()) {

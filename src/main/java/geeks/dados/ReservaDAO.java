@@ -90,6 +90,50 @@ public class ReservaDAO {
                 + "ORDER BY r.inicio_previsto LIMIT 1", idEquipamento, agora).stream().findFirst();
     }
 
+    /**
+     * Reserva ativa do cliente neste equipamento "para agora": começa em até J minutos ou já
+     * começou e ainda não terminou. É ela que vira a sessão quando o cliente chega.
+     */
+    public Optional<Linha> doClienteParaAgora(Connection c, int idEquipamento, int idCliente, LocalDateTime agora,
+                                              int janelaMinutos) throws SQLException {
+        return listar(c, "SELECT r.id_reserva, r.id_cliente, r.id_equipamento, r.inicio_previsto, r.fim_previsto "
+                + "FROM reserva AS r WHERE r.id_equipamento = ? AND r.id_cliente = ? "
+                + "AND r.status_reserva IN ('PENDENTE_ENTRADA','CONFIRMADA') AND r.id_sessao IS NULL "
+                + "AND r.inicio_previsto < ? AND r.fim_previsto > ? "
+                + "ORDER BY r.inicio_previsto LIMIT 1 FOR UPDATE",
+                idEquipamento, idCliente, agora.plusMinutes(janelaMinutos), agora).stream().findFirst();
+    }
+
+    /** A reserva virou sessão: liga as duas e marca a reserva como CONCLUIDA. */
+    public void vincularSessao(Connection c, int idReserva, int idSessao) throws SQLException {
+        Sql.atualizar(c, "UPDATE reserva SET id_sessao = ?, status_reserva = 'CONCLUIDA' WHERE id_reserva = ?",
+                idSessao, idReserva);
+    }
+
+    /** Entrada paga: a reserva passa de PENDENTE_ENTRADA para CONFIRMADA. */
+    public void confirmarEntrada(Connection c, int idReserva) throws SQLException {
+        Sql.atualizar(c, "UPDATE reserva SET status_reserva = 'CONFIRMADA' WHERE id_reserva = ?", idReserva);
+    }
+
+    /** Total já pago de entrada na reserva que virou esta sessão (0 se não veio de reserva). */
+    public BigDecimal entradaPagaDaSessao(Connection c, int idSessao) throws SQLException {
+        try (PreparedStatement ps = Sql.preparar(c, "SELECT COALESCE(SUM(p.valor_pago), 0) FROM reserva AS r "
+                + "INNER JOIN pagamento AS p ON p.id_reserva = r.id_reserva WHERE r.id_sessao = ?", idSessao);
+             ResultSet rs = ps.executeQuery()) {
+            rs.next();
+            return rs.getBigDecimal(1).setScale(2, java.math.RoundingMode.HALF_UP);
+        }
+    }
+
+    /** Fim previsto da sessão FECHADA em andamento no equipamento (vazio se não houver). */
+    public Optional<LocalDateTime> sessaoFechadaAte(Connection c, int idEquipamento) throws SQLException {
+        try (PreparedStatement ps = Sql.preparar(c, "SELECT s.horario_previsto FROM sessao AS s WHERE s.id_equipamento = ? "
+                + "AND s.horario_fim IS NULL AND s.tipo_tempo = 'FECHADO'", idEquipamento);
+             ResultSet rs = ps.executeQuery()) {
+            return rs.next() ? Optional.ofNullable(Sql.dataHora(rs, "horario_previsto")) : Optional.empty();
+        }
+    }
+
     /** Há sessão ABERTA (sem hora para acabar) em andamento no equipamento? */
     public boolean sessaoAbertaEmAndamento(Connection c, int idEquipamento) throws SQLException {
         return Sql.contar(c, "SELECT COUNT(*) FROM sessao WHERE id_equipamento = ? AND horario_fim IS NULL "

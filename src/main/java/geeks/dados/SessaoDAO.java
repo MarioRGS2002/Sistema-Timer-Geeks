@@ -89,6 +89,12 @@ public class SessaoDAO {
         }
     }
 
+    /** Crédito de tempo usado pelo cliente nesta sessão (coluna da V5). */
+    public void definirCredito(Connection c, int idSessao, int idCliente, int segundos) throws SQLException {
+        Sql.atualizar(c, "UPDATE participante_sessao SET segundos_credito = ? WHERE id_sessao = ? AND id_cliente = ?",
+                segundos, idSessao, idCliente);
+    }
+
     public void definirGratis(Connection c, int idSessao, int idCliente, int segundos) throws SQLException {
         Sql.atualizar(c, "UPDATE participante_sessao SET segundos_gratis = ? WHERE id_sessao = ? AND id_cliente = ?",
                 segundos, idSessao, idCliente);

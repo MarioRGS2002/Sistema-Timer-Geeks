@@ -16,6 +16,18 @@ public class PagamentoDAO {
     public static final String RESERVA = "RESERVA";
     public static final String ASSINATURA = "ASSINATURA";
 
+    /** Nomes das formas de pagamento ativas (Dinheiro, PIX, Débito, Crédito...), na ordem do cadastro. */
+    public java.util.List<String> formas(Connection c) throws SQLException {
+        java.util.List<String> l = new java.util.ArrayList<>();
+        try (java.sql.PreparedStatement ps = Sql.preparar(c, "SELECT f.nome FROM forma_pagamento AS f "
+                + "WHERE f.ativo = 1 ORDER BY f.id_forma_pagamento"); java.sql.ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                l.add(rs.getString(1));
+            }
+        }
+        return l;
+    }
+
     public int idForma(Connection c, String nome) throws SQLException {
         long id = Sql.contar(c, "SELECT id_forma_pagamento FROM forma_pagamento WHERE nome = ? AND ativo = 1", nome);
         if (id == 0) {
