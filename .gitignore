@@ -1,0 +1,13 @@
+# Build do Maven
+target/
+
+# Credenciais do banco (NUNCA versionar; use os arquivos .example)
+db.properties
+db.test.properties
+db/backup/backup.cnf
+db/backup/senha-backup.txt
+
+# IntelliJ (arquivos locais do usuário)
+.idea/workspace.xml
+.idea/shelf/
+out/

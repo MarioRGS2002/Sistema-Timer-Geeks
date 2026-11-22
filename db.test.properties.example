@@ -1,0 +1,14 @@
+# Conexão com o banco de TESTES (geeks_test), usado pelo JUnit (mvn verify -Pdb).
+# Copie para "db.test.properties" e use as mesmas senhas do db.properties.
+# O reset dos testes recusa rodar se o banco da URL não for exatamente geeks_test.
+
+db.url=jdbc:mysql://localhost:3306/geeks_test?useUnicode=true&characterEncoding=utf8&connectionTimeZone=-03:00&forceConnectionTimeZoneToSession=true
+
+db.migrator.usuario=geeks_migrator
+db.migrator.senha=TROQUE_PELA_SENHA_DO_MIGRATOR
+
+db.app.usuario=geeks_app
+db.app.senha=TROQUE_PELA_SENHA_DO_APP
+
+db.pool.minimo=2
+db.pool.maximo=5
