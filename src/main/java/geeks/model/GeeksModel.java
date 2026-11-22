@@ -1,27 +1,59 @@
 package geeks.model;
 
+import geeks.dados.AssinaturaDAO;
+import geeks.dados.ClienteDAO;
+import geeks.dados.CreditoDAO;
+import geeks.dados.EquipamentoDAO;
+import geeks.dados.ErroBanco;
+import geeks.dados.PagamentoDAO;
+import geeks.dados.ReservaDAO;
+import geeks.dados.SessaoDAO;
+import geeks.dados.Transacao;
+
 import java.math.BigDecimal;
-import java.time.Duration;
+import java.math.RoundingMode;
+import java.sql.Connection;
+import java.sql.SQLException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
-import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
-import java.util.TreeSet;
 import java.util.stream.Collectors;
 
-/** Regras de negócio do sistema Geeks (sem nenhuma dependência de interface gráfica). */
+/**
+ * Regras de negócio do sistema Geeks, agora com os dados no MySQL (via DAOs/JDBC).
+ * As assinaturas públicas são as mesmas usadas pelo GeeksController e pelas telas.
+ * Erros de regra: IllegalArgumentException/IllegalStateException (mensagem para a tela).
+ * Erros de banco: ErroBanco (mensagem clara, mostrada pelo tratador global do MainGeeks).
+ */
 public class GeeksModel {
-    private final List<Dispositivo> dispositivos = new ArrayList<>();
-    private final List<Cliente> clientes = new ArrayList<>();
-    private final List<Sessao> sessoes = new ArrayList<>();
-    private final List<Reserva> reservas = new ArrayList<>();
+    private final ClienteDAO clienteDAO = new ClienteDAO();
+    private final EquipamentoDAO equipamentoDAO = new EquipamentoDAO();
+    private final SessaoDAO sessaoDAO = new SessaoDAO();
+    private final ReservaDAO reservaDAO = new ReservaDAO();
+    private final AssinaturaDAO assinaturaDAO = new AssinaturaDAO();
+    private final PagamentoDAO pagamentoDAO = new PagamentoDAO();
+    private final CreditoDAO creditoDAO = new CreditoDAO();
+
+    /** Equipamentos carregados uma vez (mesmas instâncias em toda a tela). */
+    private final List<Dispositivo> dispositivos;
+    private final Map<Integer, Dispositivo> dispositivoPorId = new HashMap<>();
 
     public GeeksModel() {
-        carregarDadosDeExemplo();
+        this.dispositivos = Transacao.consultar(c -> {
+            equipamentoDAO.carregarTiposEPlano(c);
+            return equipamentoDAO.listarUtilizaveis(c);
+        });
+        for (Dispositivo d : dispositivos) {
+            dispositivoPorId.put(d.getIdEquipamento(), d);
+        }
     }
 
     // ---------- Clientes ----------
@@ -29,6 +61,9 @@ public class GeeksModel {
     public Cliente cadastrarCliente(String nome, String idadeTxt, String telefone, String cpf, String responsavel) {
         if (nome == null || nome.isBlank()) {
             throw new IllegalArgumentException("Informe o nome do cliente.");
+        }
+        if (nome.trim().length() > 100) {
+            throw new IllegalArgumentException("O nome pode ter no máximo 100 caracteres.");
         }
         int idade;
         try {
@@ -43,16 +78,25 @@ public class GeeksModel {
         if (!cpfValido(cpfNumeros)) {
             throw new IllegalArgumentException("CPF inválido.");
         }
-        if (buscarPorCpf(cpfNumeros) != null) {
-            throw new IllegalArgumentException("Já existe um cliente cadastrado com esse CPF.");
-        }
         if (idade < 18 && (responsavel == null || responsavel.isBlank())) {
             throw new IllegalArgumentException("Clientes menores de 18 anos precisam de um responsável.");
         }
-        Cliente cliente = new Cliente(nome.trim(), idade, telefone == null ? "" : telefone.trim(), cpfNumeros,
-                responsavel == null ? "" : responsavel.trim());
-        clientes.add(cliente);
-        return cliente;
+        String tel = telefone == null ? "" : telefone.trim();
+        if (tel.length() > 20) {
+            throw new IllegalArgumentException("Telefone inválido.");
+        }
+        // PENDÊNCIA DO FRONT: a tela pede a idade (não a data de nascimento) e só o NOME do
+        // responsável. data_nascimento = hoje - idade; o responsável não é gravado porque o
+        // banco exige o CPF dele (ver README, "Pendências que dependem do front").
+        LocalDate nascimento = LocalDate.now().minusYears(idade);
+        LocalDate hoje = LocalDate.now();
+        return Transacao.executar(c -> {
+            if (clienteDAO.existeCpf(c, cpfNumeros)) {
+                throw new IllegalArgumentException("Já existe um cliente cadastrado com esse CPF.");
+            }
+            int id = clienteDAO.inserir(c, nome.trim(), nascimento, tel, cpfNumeros);
+            return clienteDAO.porId(c, id, hoje).orElseThrow();
+        });
     }
 
     /** Busca por CPF (somente números) ou por parte do nome. */
@@ -61,19 +105,41 @@ public class GeeksModel {
             return null;
         }
         String numeros = termo.replaceAll("\\D", "");
-        if (numeros.length() == 11) {
-            return buscarPorCpf(numeros);
-        }
-        String t = termo.trim().toLowerCase(Locale.ROOT);
-        return clientes.stream().filter(c -> c.getNome().toLowerCase(Locale.ROOT).contains(t)).findFirst().orElse(null);
+        LocalDate hoje = LocalDate.now();
+        return Transacao.consultar(c -> {
+            Optional<Cliente> r = numeros.length() == 11
+                    ? clienteDAO.porCpf(c, numeros, hoje)
+                    : clienteDAO.porParteDoNome(c, termo.trim(), hoje);
+            return r.orElse(null);
+        });
     }
 
-    private Cliente buscarPorCpf(String cpf) {
-        return clientes.stream().filter(c -> c.getCpf().equals(cpf)).findFirst().orElse(null);
-    }
-
+    /**
+     * Assinar (Plano.CLUBE) ou cancelar (Plano.NENHUM) o Clube Geeks.
+     * Assinar: cria assinatura de 1 mês ou renova a ativa, e registra o pagamento da mensalidade.
+     */
     public void assinarPlano(Cliente cliente, Plano plano) {
-        cliente.setPlano(plano);
+        int idFuncionario = Contexto.idFuncionario();
+        LocalDate hoje = LocalDate.now();
+        if (plano == Plano.NENHUM) {
+            Transacao.executar(c -> assinaturaDAO.cancelar(c, cliente.getIdCliente()));
+            cliente.setPlano(Plano.NENHUM);
+            return;
+        }
+        Transacao.executar(c -> {
+            Optional<Integer> ativa = assinaturaDAO.ativaParaAtualizar(c, cliente.getIdCliente());
+            int idAssinatura;
+            if (ativa.isPresent()) {
+                idAssinatura = ativa.get();
+                assinaturaDAO.renovar(c, idAssinatura, hoje);
+            } else {
+                idAssinatura = assinaturaDAO.criar(c, Plano.CLUBE.getIdPlano(), cliente.getIdCliente(), hoje);
+            }
+            pagamentoDAO.registrar(c, LocalDateTime.now(), Plano.CLUBE.getValor(), null, PagamentoDAO.ASSINATURA,
+                    pagamentoDAO.idForma(c, Regras.FORMA_PAGAMENTO_PADRAO), idFuncionario, null, null, idAssinatura);
+            return null;
+        });
+        cliente.setPlano(Plano.CLUBE);
     }
 
     private boolean cpfValido(String cpf) {
@@ -94,99 +160,212 @@ public class GeeksModel {
 
     // ---------- Sessões ----------
 
+    /**
+     * Abre sessão. A tela não pergunta o tipo de tempo: sessões abertas no balcão são
+     * tempo ABERTO (presencial, sem hora para acabar). Se houver reserva do equipamento a
+     * menos de J minutos, avisa e sugere equipamentos livres do mesmo tipo.
+     */
     public Sessao iniciarSessao(Cliente cliente, Dispositivo dispositivo) {
-        if (dispositivoOcupado(dispositivo)) {
-            throw new IllegalStateException("O dispositivo " + dispositivo.getNome() + " já está em uso.");
-        }
-        Sessao sessao = new Sessao(cliente, dispositivo, LocalDateTime.now());
-        sessoes.add(sessao);
-        return sessao;
+        int idFuncionario = Contexto.idFuncionario();
+        LocalDateTime agora = LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS);
+        int idSessao = Transacao.executar(c -> {
+            equipamentoDAO.travar(c, dispositivo.getIdEquipamento());
+            if (sessaoDAO.clienteEmSessaoAtiva(c, cliente.getIdCliente())) {
+                throw new IllegalStateException(cliente.getNome() + " já está em uma sessão ativa.");
+            }
+            Optional<ReservaDAO.Linha> prox = reservaDAO.proximaAtiva(c, dispositivo.getIdEquipamento(), agora);
+            if (prox.isPresent() && prox.get().inicio.isBefore(agora.plusMinutes(Regras.JANELA_MINUTOS))
+                    && prox.get().idCliente != cliente.getIdCliente()) {
+                List<String> livres = equipamentoDAO.livresMesmoTipo(c, dispositivo.getIdEquipamento(), agora,
+                        prox.get().fim, agora, Regras.JANELA_MINUTOS);
+                throw new IllegalStateException("O dispositivo " + dispositivo.getNome() + " tem reserva às "
+                        + prox.get().inicio.toLocalTime() + "." + sugestao(livres));
+            }
+            try {
+                int id = sessaoDAO.abrir(c, TipoTempo.ABERTO.name(), agora, null, dispositivo.getTipo().getValorHora(),
+                        dispositivo.getIdEquipamento(), idFuncionario, cliente.getIdCliente());
+                equipamentoDAO.definirStatus(c, dispositivo.getIdEquipamento(), "EM_USO");
+                return id;
+            } catch (SQLException e) {
+                if (String.valueOf(e.getMessage()).contains("uq_sessao_equipamento_em_uso")) {
+                    throw new IllegalStateException("O dispositivo " + dispositivo.getNome() + " já está em uso.");
+                }
+                throw e;
+            }
+        });
+        return getSessoesAtivas().stream().filter(s -> s.getIdSessao() == idSessao).findFirst().orElse(null);
     }
 
+    private static String sugestao(List<String> livres) {
+        return livres.isEmpty() ? " Não há outro equipamento do mesmo tipo livre."
+                : " Livres do mesmo tipo: " + String.join(", ", livres) + ".";
+    }
+
+    /**
+     * Encerra a sessão numa única transação: trava a sessão, grava fim e valor, a hora grátis
+     * do Clube usada, os pagamentos (grátis = valor 0 sem forma) e o crédito do tempo pago
+     * e não usado. Em qualquer falha, nada fica gravado (rollback). O equipamento volta a
+     * DISPONIVEL na mesma transação.
+     */
     public Sessao encerrarSessao(String id) {
-        Sessao sessao = sessoes.stream().filter(s -> s.getId().equals(id)).findFirst().orElse(null);
-        if (sessao != null) {
-            sessao.encerrar();
+        int idSessao = idNumerico(id, "S");
+        int idFuncionario = Contexto.idFuncionario();
+        LocalDateTime fim = LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS);
+        Transacao.executar(c -> {
+            encerrar(c, idSessao, fim, idFuncionario);
+            return null;
+        });
+        return null;
+    }
+
+    /** Encerramento em uma conexão já em transação (usado também pelos testes). */
+    public void encerrar(Connection c, int idSessao, LocalDateTime fim, int idFuncionario) throws SQLException {
+        SessaoDAO.Linha s = sessaoDAO.travarAtiva(c, idSessao);
+        LocalDate dia = s.inicio.toLocalDate();
+        int gratisDisponivel = 0;
+        if (assinaturaDAO.emDia(c, s.idCliente, dia)) {
+            gratisDisponivel = Math.max(0, Cobranca.SEGUNDOS_HORA - sessaoDAO.gratisUsadoNoDia(c, s.idCliente, dia));
         }
-        return sessao;
+        Cobranca cob = Cobranca.calcular(TipoTempo.valueOf(s.tipoTempo), s.inicio, s.previsto, fim, s.valorHora,
+                gratisDisponivel);
+        sessaoDAO.encerrar(c, idSessao, fim, cob.getValor());
+        sessaoDAO.definirGratis(c, idSessao, s.idCliente, cob.getSegundosGratis());
+        if (cob.getSegundosGratis() > 0) {
+            pagamentoDAO.registrar(c, fim, BigDecimal.ZERO.setScale(2), "SAIDA", PagamentoDAO.SESSAO, null,
+                    idFuncionario, idSessao, null, null);
+        }
+        if (cob.getValor().signum() > 0) {
+            pagamentoDAO.registrar(c, fim, cob.getValor(), "SAIDA", PagamentoDAO.SESSAO,
+                    pagamentoDAO.idForma(c, Regras.FORMA_PAGAMENTO_PADRAO), idFuncionario, idSessao, null, null);
+        }
+        if (cob.getMinutosCredito() > 0) {
+            creditoDAO.gerar(c, s.idCliente, s.idTipo, idSessao, cob.getMinutosCredito(), fim);
+        }
+        equipamentoDAO.definirStatus(c, s.idEquipamento, "DISPONIVEL");
     }
 
     public boolean dispositivoOcupado(Dispositivo dispositivo) {
-        return sessoes.stream().anyMatch(s -> s.isAtiva() && s.getDispositivo() == dispositivo);
+        return getSessoesAtivas().stream().anyMatch(s -> s.getDispositivo().equals(dispositivo));
     }
 
     public List<Dispositivo> getDispositivosLivres() {
-        return dispositivos.stream().filter(d -> !dispositivoOcupado(d)).collect(Collectors.toList());
+        Set<Dispositivo> ocupados = getSessoesAtivas().stream().map(Sessao::getDispositivo).collect(Collectors.toSet());
+        return dispositivos.stream().filter(d -> !ocupados.contains(d)).collect(Collectors.toList());
     }
 
     public List<Sessao> getSessoesAtivas() {
-        return sessoes.stream().filter(Sessao::isAtiva).collect(Collectors.toList());
+        LocalDate hoje = LocalDate.now();
+        return Transacao.consultar(c -> {
+            List<SessaoDAO.Linha> linhas = sessaoDAO.ativas(c);
+            Map<Integer, Cliente> clientes = clientesPorId(c, hoje);
+            List<Sessao> lista = new ArrayList<>();
+            for (SessaoDAO.Linha l : linhas) {
+                Cliente cl = clientes.get(l.idCliente);
+                int gratis = 0;
+                if (cl != null && cl.getPlano() == Plano.CLUBE && assinaturaDAO.emDia(c, l.idCliente, l.inicio.toLocalDate())) {
+                    gratis = Math.max(0, Cobranca.SEGUNDOS_HORA - sessaoDAO.gratisUsadoNoDia(c, l.idCliente, l.inicio.toLocalDate()));
+                }
+                lista.add(montar(l, cl, gratis));
+            }
+            return lista;
+        });
     }
 
+    /** Total recebido hoje (todos os pagamentos com data de hoje). */
     public BigDecimal getFaturamentoHoje() {
         LocalDate hoje = LocalDate.now();
-        return sessoes.stream().filter(s -> s.getInicio().toLocalDate().equals(hoje))
-                .map(Sessao::getValor).reduce(BigDecimal.ZERO, BigDecimal::add);
+        return Transacao.consultar(c -> pagamentoDAO.total(c, hoje.atStartOfDay(), hoje.plusDays(1).atStartOfDay()));
     }
 
     // ---------- Histórico ----------
 
     public List<Sessao> filtrarHistorico(PeriodoHistorico periodo, String texto) {
         LocalDate inicio = periodo.inicio(LocalDate.now());
-        String t = texto == null ? "" : texto.trim().toLowerCase(Locale.ROOT);
-        return sessoes.stream()
-                .filter(s -> !s.isAtiva() && !s.getFim().toLocalDate().isBefore(inicio))
-                .filter(s -> t.isEmpty()
-                        || s.getDispositivo().getNome().toLowerCase(Locale.ROOT).contains(t)
-                        || s.getDispositivo().getTipo().getRotulo().toLowerCase(Locale.ROOT).contains(t)
-                        || s.getCliente().getNome().toLowerCase(Locale.ROOT).contains(t))
-                .sorted(Comparator.comparing(Sessao::getFim).reversed())
-                .collect(Collectors.toList());
+        LocalDate hoje = LocalDate.now();
+        return Transacao.consultar(c -> {
+            Map<Integer, Cliente> clientes = clientesPorId(c, hoje);
+            List<Sessao> lista = new ArrayList<>();
+            for (SessaoDAO.Linha l : sessaoDAO.historico(c, inicio.atStartOfDay(), texto)) {
+                lista.add(montar(l, clientes.get(l.idCliente), 0));
+            }
+            return lista;
+        });
     }
 
     // ---------- Reservas ----------
 
     public Reserva registrarReserva(Cliente cliente, Dispositivo dispositivo, LocalDateTime dataHora) {
-        if (dataHora.isBefore(LocalDateTime.now())) {
+        LocalDateTime agora = LocalDateTime.now();
+        if (dataHora.isBefore(agora)) {
             throw new IllegalArgumentException("A reserva precisa ser para um horário futuro.");
         }
-        verificarConflito(dispositivo, dataHora, null);
-        Reserva reserva = new Reserva(cliente, dispositivo, dataHora);
-        reservas.add(reserva);
-        return reserva;
+        LocalDateTime fim = dataHora.plusMinutes(Regras.DURACAO_RESERVA_MINUTOS);
+        BigDecimal valor = dispositivo.getTipo().getValorHora()
+                .multiply(BigDecimal.valueOf(Regras.DURACAO_RESERVA_MINUTOS))
+                .divide(BigDecimal.valueOf(60), 2, RoundingMode.HALF_UP);
+        BigDecimal entrada = valor.multiply(Regras.PERCENTUAL_ENTRADA).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+        int id = Transacao.executar(c -> {
+            equipamentoDAO.travar(c, dispositivo.getIdEquipamento());
+            verificarConflito(c, dispositivo, 0, dataHora, fim, agora);
+            return reservaDAO.inserir(c, dataHora, fim, valor, Regras.PERCENTUAL_ENTRADA, entrada,
+                    cliente.getIdCliente(), dispositivo.getIdEquipamento());
+        });
+        return new Reserva(id, cliente, dispositivo, dataHora, fim);
     }
 
     public void alterarReserva(Reserva reserva, LocalDateTime novaDataHora) {
-        if (novaDataHora.isBefore(LocalDateTime.now())) {
+        LocalDateTime agora = LocalDateTime.now();
+        if (novaDataHora.isBefore(agora)) {
             throw new IllegalArgumentException("A reserva precisa ser para um horário futuro.");
         }
-        verificarConflito(reserva.getDispositivo(), novaDataHora, reserva);
-        reserva.setDataHora(novaDataHora);
+        Transacao.executar(c -> {
+            equipamentoDAO.travar(c, reserva.getDispositivo().getIdEquipamento());
+            ReservaDAO.Linha atual = reservaDAO.travar(c, reserva.getIdReserva());
+            long duracao = ChronoUnit.MINUTES.between(atual.inicio, atual.fim);
+            LocalDateTime novoFim = novaDataHora.plusMinutes(duracao);
+            verificarConflito(c, reserva.getDispositivo(), reserva.getIdReserva(), novaDataHora, novoFim, agora);
+            reservaDAO.alterarHorario(c, reserva.getIdReserva(), novaDataHora, novoFim);
+            return null;
+        });
     }
 
+    /** Cancelar = status 'CANCELADA' (a reserva não é apagada, fica no histórico). */
     public void cancelarReserva(Reserva reserva) {
-        reservas.remove(reserva);
+        Transacao.executar(c -> reservaDAO.cancelar(c, reserva.getIdReserva()));
     }
 
-    private void verificarConflito(Dispositivo dispositivo, LocalDateTime dataHora, Reserva ignorada) {
-        boolean conflito = reservas.stream().anyMatch(r -> r != ignorada && r.getDispositivo() == dispositivo
-                && Math.abs(Duration.between(r.getDataHora(), dataHora).toMinutes()) < 60);
-        if (conflito) {
+    private void verificarConflito(Connection c, Dispositivo d, int idIgnorar, LocalDateTime ini, LocalDateTime fim,
+                                   LocalDateTime agora) throws SQLException {
+        if (reservaDAO.conflitos(c, d.getIdEquipamento(), idIgnorar, ini, fim, Regras.JANELA_MINUTOS) > 0) {
             throw new IllegalStateException("Esse dispositivo já tem reserva em um horário próximo (mínimo de 1 hora de intervalo).");
+        }
+        if (ini.isBefore(agora.plusMinutes(Regras.JANELA_MINUTOS)) && reservaDAO.sessaoAbertaEmAndamento(c, d.getIdEquipamento())) {
+            List<String> livres = equipamentoDAO.livresMesmoTipo(c, d.getIdEquipamento(), ini, fim, agora, Regras.JANELA_MINUTOS);
+            throw new IllegalStateException("O dispositivo " + d.getNome() + " está em uso sem hora para acabar." + sugestao(livres));
         }
     }
 
     public List<Reserva> getReservasDoDia(LocalDate dia) {
-        return reservas.stream().filter(r -> r.getDataHora().toLocalDate().equals(dia))
-                .sorted(Comparator.comparing(Reserva::getDataHora)).collect(Collectors.toList());
+        LocalDate hoje = LocalDate.now();
+        return Transacao.consultar(c -> {
+            Map<Integer, Cliente> clientes = clientesPorId(c, hoje);
+            List<Reserva> lista = new ArrayList<>();
+            for (ReservaDAO.Linha l : reservaDAO.ativasNoPeriodo(c, dia.atStartOfDay(), dia.plusDays(1).atStartOfDay())) {
+                Dispositivo d = dispositivoPorId.get(l.idEquipamento);
+                Cliente cl = clientes.get(l.idCliente);
+                if (d != null && cl != null) {
+                    lista.add(new Reserva(l.idReserva, cl, d, l.inicio, l.fim));
+                }
+            }
+            return lista;
+        });
     }
 
     public Set<LocalDate> getDiasComReserva(YearMonth mes) {
-        Set<LocalDate> dias = new TreeSet<>();
-        for (Reserva r : reservas) {
-            dias.add(r.getDataHora().toLocalDate());
-        }
-        return dias;
+        // inclui a semana anterior e a seguinte, que também aparecem no calendário
+        LocalDate ini = mes.atDay(1).minusDays(7);
+        LocalDate fim = mes.atEndOfMonth().plusDays(15);
+        return Transacao.consultar(c -> reservaDAO.diasComReserva(c, ini, fim));
     }
 
     public List<Dispositivo> getDispositivos() {
@@ -194,48 +373,46 @@ public class GeeksModel {
     }
 
     public List<Cliente> getClientes() {
-        return clientes;
+        LocalDate hoje = LocalDate.now();
+        return Transacao.consultar(c -> clienteDAO.listarAtivos(c, hoje));
     }
 
-    // ---------- Dados de exemplo (remover quando houver persistência) ----------
-
-    private void carregarDadosDeExemplo() {
-        Dispositivo pc1 = new Dispositivo("PC01", TipoDispositivo.PC);
-        Dispositivo pc2 = new Dispositivo("PC02", TipoDispositivo.PC);
-        Dispositivo ps5 = new Dispositivo("Ps5", TipoDispositivo.PLAYSTATION);
-        Dispositivo nsw = new Dispositivo("Nintendo Switch", TipoDispositivo.SWITCH);
-        Dispositivo xad = new Dispositivo("Xadrez", TipoDispositivo.XADREZ);
-        dispositivos.addAll(List.of(pc1, pc2, ps5, nsw, xad));
-
-        Cliente gabriel = new Cliente("Gabriel Dantas", 22, "(75) 99999-0001", "11144477735", "");
-        Cliente mario = new Cliente("Mario Romero", 25, "(75) 99999-0002", "52998224725", "");
-        Cliente wby = new Cliente("Wbyrathan", 19, "(75) 99999-0003", "39053344705", "");
-        Cliente matheus = new Cliente("Matheus Barbosa", 20, "(75) 99999-0004", "16899535009", "");
-        Cliente nicolas = new Cliente("Nicolas Aragão", 16, "(75) 99999-0005", "11122233396", "Fernanda Aragão");
-        gabriel.setPlano(Plano.CLUBE);
-        clientes.addAll(List.of(gabriel, mario, wby, matheus, nicolas));
-
-        LocalDateTime agora = LocalDateTime.now();
-        sessoes.add(new Sessao(gabriel, pc1, agora.minusMinutes(92)));
-        sessoes.add(new Sessao(mario, pc2, agora.minusMinutes(48)));
-        sessoes.add(new Sessao(wby, xad, agora.minusMinutes(130)));
-        sessoes.add(new Sessao(matheus, ps5, agora.minusMinutes(65)));
-        sessoes.add(new Sessao(nicolas, nsw, agora.minusMinutes(25)));
-
-        historicoExemplo(gabriel, pc1, agora.minusDays(1), 90);
-        historicoExemplo(gabriel, ps5, agora.minusDays(3), 60);
-        historicoExemplo(mario, pc2, agora.minusDays(12), 120);
-        historicoExemplo(nicolas, nsw, agora.minusDays(40), 45);
-        historicoExemplo(matheus, ps5, agora.minusDays(100), 80);
-
-        reservas.add(new Reserva(gabriel, pc1, agora.withHour(21).withMinute(0).withSecond(0).withNano(0)));
-        reservas.add(new Reserva(matheus, ps5, agora.withHour(22).withMinute(30).withSecond(0).withNano(0)));
-        reservas.add(new Reserva(mario, pc2, agora.plusDays(1).withHour(10).withMinute(0).withSecond(0).withNano(0)));
+    /** Saldo de crédito de tempo do cliente, em minutos (créditos dentro da validade). */
+    public int getSaldoCredito(Cliente cliente) {
+        LocalDate hoje = LocalDate.now();
+        return Transacao.consultar(c -> creditoDAO.saldo(c, cliente.getIdCliente(), hoje));
     }
 
-    private void historicoExemplo(Cliente c, Dispositivo d, LocalDateTime fim, int minutos) {
-        Sessao s = new Sessao(c, d, fim.minusMinutes(minutos));
-        s.encerrarEm(fim);
-        sessoes.add(s);
+    // ---------- auxiliares ----------
+
+    private Map<Integer, Cliente> clientesPorId(Connection c, LocalDate hoje) throws SQLException {
+        Map<Integer, Cliente> m = new HashMap<>();
+        for (Cliente cl : clienteDAO.listarAtivos(c, hoje)) {
+            m.put(cl.getIdCliente(), cl);
+        }
+        return m;
+    }
+
+    private Sessao montar(SessaoDAO.Linha l, Cliente cl, int gratisDisponivel) {
+        Cliente cliente = cl != null ? cl
+                : new Cliente(l.idCliente, "Cliente #" + l.idCliente, LocalDate.now().minusYears(18), "", "", "");
+        Dispositivo d = dispositivoPorId.get(l.idEquipamento);
+        if (d == null) {
+            d = new Dispositivo(l.idEquipamento, "Equipamento #" + l.idEquipamento, TipoDispositivo.PC);
+        }
+        return new Sessao(l.idSessao, cliente, d, l.inicio, l.previsto, l.fim, TipoTempo.valueOf(l.tipoTempo),
+                l.valorHora, gratisDisponivel, l.valorTotal);
+    }
+
+    private static int idNumerico(String id, String prefixo) {
+        String s = id == null ? "" : id.trim().toUpperCase(Locale.ROOT);
+        if (s.startsWith(prefixo)) {
+            s = s.substring(prefixo.length());
+        }
+        try {
+            return Integer.parseInt(s);
+        } catch (NumberFormatException e) {
+            throw new ErroBanco("Identificador inválido: " + id);
+        }
     }
 }

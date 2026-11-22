@@ -1,30 +1,24 @@
 package geeks.model;
 
-import java.math.BigInteger;
+import geeks.dados.FuncionarioDAO;
+import geeks.dados.Transacao;
+import org.mindrot.jbcrypt.BCrypt;
+
+import java.nio.CharBuffer;
 import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.util.HashMap;
+import java.util.Arrays;
 import java.util.Locale;
-import java.util.Map;
+import java.util.Optional;
 
 /**
- * Regras de autenticação. As senhas ficam guardadas como hash SHA-256 (nunca em texto puro).
- * Os usuários são de EXEMPLO e ficam em memória; no sistema final virão de um banco de dados
- * (com hash que use "sal", como BCrypt).
+ * Autenticação dos funcionários pela tabela funcionario (senha_hash em BCrypt).
+ * Funcionário inativo (ativo = 0) não entra. Ao autenticar, o funcionário fica no Contexto.
  */
 public class LoginModel {
-    private final Map<String, Usuario> usuarios = new HashMap<>();
+    /** Hash fixo usado quando o login não existe, para o tempo de resposta não revelar isso. */
+    private static final String HASH_FALSO = "$2a$10$7EqJtq98hPqEX7fNZaFWoOhi5BpEwEfI8m6EqTxl0d3HjS4FfwQ8m";
 
-    public LoginModel() {
-        // EXEMPLOS: "atendente" / "geeks123" e "gerente" / "gerente123"
-        cadastrar(new Usuario("atendente", "Atendente", hash("geeks123"), Perfil.ATENDENTE));
-        cadastrar(new Usuario("gerente", "Gerente", hash("gerente123"), Perfil.GERENTE));
-    }
-
-    private void cadastrar(Usuario usuario) {
-        usuarios.put(usuario.getLogin(), usuario);
-    }
+    private final FuncionarioDAO dao = new FuncionarioDAO();
 
     /**
      * @return o usuário autenticado, ou null se usuário/senha estiverem incorretos
@@ -34,22 +28,30 @@ public class LoginModel {
         if (login == null || login.isBlank() || senha == null || senha.length == 0) {
             throw new IllegalArgumentException("Informe usuário e senha.");
         }
-        Usuario usuario = usuarios.get(login.trim().toLowerCase(Locale.ROOT));
-        String informado = hash(new String(senha));
-        if (usuario == null) {
-            return null;
+        String l = login.trim().toLowerCase(Locale.ROOT);
+        Optional<FuncionarioDAO.Registro> reg = Transacao.consultar(c -> dao.buscarAtivo(c, l));
+        String texto = new String(senha);
+        try {
+            boolean confere = BCrypt.checkpw(texto, reg.map(r -> r.senhaHash).orElse(HASH_FALSO));
+            if (reg.isEmpty() || !confere) {
+                return null;
+            }
+            FuncionarioDAO.Registro r = reg.get();
+            Usuario u = new Usuario(r.id, r.login, r.nome, Perfil.valueOf(r.cargo));
+            Contexto.entrar(u);
+            return u;
+        } catch (IllegalArgumentException e) {
+            return null; // hash gravado em formato inválido
         }
-        boolean confere = MessageDigest.isEqual(usuario.getHashSenha().getBytes(StandardCharsets.UTF_8),
-                informado.getBytes(StandardCharsets.UTF_8));
-        return confere ? usuario : null;
     }
 
-    private static String hash(String texto) {
+    /** Gera o hash BCrypt (custo 11) de uma senha. */
+    public static String gerarHash(char[] senha) {
+        byte[] bytes = StandardCharsets.UTF_8.encode(CharBuffer.wrap(senha)).array();
         try {
-            byte[] bytes = MessageDigest.getInstance("SHA-256").digest(texto.getBytes(StandardCharsets.UTF_8));
-            return String.format("%064x", new BigInteger(1, bytes));
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException("SHA-256 indisponível", e);
+            return BCrypt.hashpw(new String(senha), BCrypt.gensalt(11));
+        } finally {
+            Arrays.fill(bytes, (byte) 0);
         }
     }
 }

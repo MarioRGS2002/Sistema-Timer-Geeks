@@ -1,16 +1,21 @@
 package geeks.model;
 
+/** Funcionário que usa o sistema (tabela funcionario). */
 public class Usuario {
+    private final int idFuncionario;
     private final String login;
     private final String nome;
-    private final String hashSenha;
     private final Perfil perfil;
 
-    public Usuario(String login, String nome, String hashSenha, Perfil perfil) {
+    public Usuario(int idFuncionario, String login, String nome, Perfil perfil) {
+        this.idFuncionario = idFuncionario;
         this.login = login;
         this.nome = nome;
-        this.hashSenha = hashSenha;
         this.perfil = perfil;
+    }
+
+    public int getIdFuncionario() {
+        return idFuncionario;
     }
 
     public String getLogin() {
@@ -27,9 +32,5 @@ public class Usuario {
 
     public boolean isGerente() {
         return perfil == Perfil.GERENTE;
-    }
-
-    String getHashSenha() {
-        return hashSenha;
     }
 }

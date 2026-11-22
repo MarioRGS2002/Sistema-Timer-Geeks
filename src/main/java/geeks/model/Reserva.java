@@ -2,24 +2,30 @@ package geeks.model;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Objects;
 
+/** Reserva de equipamento, sempre em tempo FECHADO (tabela reserva). */
 public class Reserva {
-    private static int contador = 0;
-
-    private final String id;
+    private final int idReserva;
     private final Cliente cliente;
     private final Dispositivo dispositivo;
-    private LocalDateTime dataHora;
+    private final LocalDateTime dataHora;
+    private final LocalDateTime fim;
 
-    public Reserva(Cliente cliente, Dispositivo dispositivo, LocalDateTime dataHora) {
-        this.id = "R" + (++contador);
+    public Reserva(int idReserva, Cliente cliente, Dispositivo dispositivo, LocalDateTime dataHora, LocalDateTime fim) {
+        this.idReserva = idReserva;
         this.cliente = cliente;
         this.dispositivo = dispositivo;
         this.dataHora = dataHora;
+        this.fim = fim;
     }
 
     public String getId() {
-        return id;
+        return "R" + idReserva;
+    }
+
+    public int getIdReserva() {
+        return idReserva;
     }
 
     public Cliente getCliente() {
@@ -30,12 +36,23 @@ public class Reserva {
         return dispositivo;
     }
 
+    /** Início previsto da reserva. */
     public LocalDateTime getDataHora() {
         return dataHora;
     }
 
-    public void setDataHora(LocalDateTime dataHora) {
-        this.dataHora = dataHora;
+    public LocalDateTime getFim() {
+        return fim;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        return o instanceof Reserva && ((Reserva) o).idReserva == idReserva;
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(idReserva);
     }
 
     @Override
