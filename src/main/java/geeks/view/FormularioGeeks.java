@@ -21,6 +21,7 @@ public abstract class FormularioGeeks extends JPanel {
     private final JPanel corpo = Componentes.transparente(new BorderLayout());
     private final JLabel resumo = Componentes.rotulo(" ", Font.PLAIN, 14, Tema.CINZA);
     private final BotaoGeeks btConfirmar;
+    private BotaoGeeks btCancelar;
     private Runnable aoConfirmar = () -> { };
     private Runnable aoCancelar = () -> { };
 
@@ -42,7 +43,7 @@ public abstract class FormularioGeeks extends JPanel {
         }
 
         btConfirmar = new BotaoGeeks(textoConfirmar, icone, BotaoGeeks.Estilo.PREENCHIDO);
-        BotaoGeeks btCancelar = new BotaoGeeks("Cancelar", null, BotaoGeeks.Estilo.CONTORNO);
+        btCancelar = new BotaoGeeks("Cancelar", null, BotaoGeeks.Estilo.CONTORNO);
         btConfirmar.addActionListener(e -> aoConfirmar.run());
         btCancelar.addActionListener(e -> aoCancelar.run());
         JPanel botoes = Componentes.transparente(new FlowLayout(FlowLayout.RIGHT, 10, 0));
@@ -65,6 +66,11 @@ public abstract class FormularioGeeks extends JPanel {
 
     protected void setResumo(String texto) {
         resumo.setText(texto);
+    }
+
+    /** Troca o texto do botão secundário (ex.: "Fechar" numa ficha que também pode ser editada). */
+    protected void setTextoCancelar(String texto) {
+        btCancelar.setText(texto);
     }
 
     protected void setConfirmarHabilitado(boolean habilitado) {

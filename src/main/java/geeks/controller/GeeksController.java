@@ -13,6 +13,7 @@ import geeks.model.AvisoReserva;
 import geeks.model.Contexto;
 import geeks.model.Regras;
 import javax.swing.SwingUtilities;
+import java.math.BigDecimal;
 import geeks.model.GeeksModel;
 import geeks.model.PeriodoFaturamento;
 import geeks.model.SerieFaturamento;
@@ -45,6 +46,8 @@ public class GeeksController {
     private final boolean gerente;
     private final FaturamentoModel faturamento = new FaturamentoModel();
     private final FuncionariosModel funcionarios = new FuncionariosModel();
+    private final geeks.model.CaixaModel caixa = new geeks.model.CaixaModel();
+    private LocalDate diaCaixa = LocalDate.now();
     private final int idLogado;
     private Timer timer;
     /** Reservas já avisadas nesta execução (o aviso de sessão acabando fica marcado no banco). */
@@ -68,11 +71,13 @@ public class GeeksController {
         if (gerente) {
             ligarFaturamento();
             ligarFuncionarios();
+            ligarCaixa();
         }
         if (usuario != null) {
             view.setUsuario(usuario.getNome(), usuario.getPerfil().getRotulo());
         }
         view.addListenerSair(e -> sair());
+        view.getPainelSessoes().setMostrarFaturamento(gerente);
 
         // A cada 30 segundos: tempo e valor das sessões ativas e os avisos (tempo acabando, reserva chegando)
         timer = new Timer(30_000, e -> {
@@ -92,11 +97,15 @@ public class GeeksController {
     private void ligarNavegacao() {
         view.addListenerNavegacao(e -> {
             String tela = e.getActionCommand();
-            if ((JanelaPrincipal.FATURAMENTO.equals(tela) || JanelaPrincipal.FUNCIONARIOS.equals(tela)) && !gerente) {
-                return; // faturamento e funcionários são exclusivos do gerente
+            if ((JanelaPrincipal.FATURAMENTO.equals(tela) || JanelaPrincipal.FUNCIONARIOS.equals(tela)
+                    || JanelaPrincipal.CAIXA.equals(tela)) && !gerente) {
+                return; // faturamento, caixa e funcionários são exclusivos do gerente
             }
             if (JanelaPrincipal.FUNCIONARIOS.equals(tela)) {
                 atualizarFuncionarios();
+            }
+            if (JanelaPrincipal.CAIXA.equals(tela)) {
+                atualizarCaixa();
             }
             view.mostrarTela(tela);
         });
@@ -105,6 +114,7 @@ public class GeeksController {
     private void ligarSessoes() {
         view.getPainelSessoes().addListenerNovaSessao(e -> novaSessao());
         view.getPainelSessoes().addListenerEncerrarSessao(e -> encerrarSessao(e.getActionCommand()));
+        view.getPainelSessoes().addListenerMaisTempo(e -> maisTempo(e.getActionCommand()));
     }
 
     private void ligarReservas() {
@@ -130,12 +140,7 @@ public class GeeksController {
         view.getPainelHistorico().addListenerFiltro(e -> atualizarHistorico());
         view.getPainelHistorico().addListenerBusca(new AoDigitar(this::atualizarHistorico));
         view.getPainelHistorico().addListenerDadosUsuario(e -> {
-            geeks.model.FichaCliente ficha = model.getFicha(Integer.parseInt(e.getActionCommand()));
-            if (ficha == null) {
-                Dialogos.info(view, "Não encontrei o cadastro desse cliente.");
-            } else {
-                Dialogos.mostrarCliente(view, ficha);
-            }
+            mostrarFicha(Integer.parseInt(e.getActionCommand()));
         });
     }
 
@@ -191,6 +196,86 @@ public class GeeksController {
         view.getPainelFaturamento().atualizar(serie, podeAvancar, periodoAtual);
     }
 
+    // ---------- Caixa e estorno (somente gerente) ----------
+
+    private void ligarCaixa() {
+        var p = view.getPainelCaixa();
+        p.addListenerAnterior(e -> {
+            diaCaixa = diaCaixa.minusDays(1);
+            atualizarCaixa();
+        });
+        p.addListenerProximo(e -> {
+            diaCaixa = diaCaixa.plusDays(1);
+            atualizarCaixa();
+        });
+        p.addListenerHoje(e -> {
+            diaCaixa = LocalDate.now();
+            atualizarCaixa();
+        });
+        p.addListenerEstornar(e -> estornar(Integer.parseInt(e.getActionCommand())));
+    }
+
+    private void atualizarCaixa() {
+        view.getPainelCaixa().atualizar(caixa.dia(diaCaixa), diaCaixa.isBefore(LocalDate.now()));
+    }
+
+    private void estornar(int idPagamento) {
+        geeks.dados.CaixaDAO.Pagamento pag = caixa.dia(diaCaixa).pagamentos.stream()
+                .filter(x -> x.idPagamento == idPagamento).findFirst().orElse(null);
+        if (pag == null) {
+            return;
+        }
+        String[] r = Dialogos.pedirEstorno(view, pag);
+        if (r == null) {
+            return;
+        }
+        BigDecimal valor = geeks.model.CaixaModel.lerValor(r[0]);
+        if (valor == null) {
+            Dialogos.erro(view, "Valor inválido. Use por exemplo 10,00.");
+            return;
+        }
+        try {
+            caixa.estornar(idPagamento, valor, r[1]);
+            atualizarCaixa();
+            atualizarSessoes();
+            atualizarFaturamento();
+            Dialogos.sucesso(view, "Estorno de " + Formatador.moeda(valor) + " registrado.");
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            Dialogos.erro(view, ex.getMessage());
+        }
+    }
+
+    // ---------- Ficha e edição do cliente ----------
+
+    private void mostrarFicha(int idCliente) {
+        geeks.model.FichaCliente ficha = model.getFicha(idCliente);
+        if (ficha == null) {
+            Dialogos.info(view, "Não encontrei o cadastro desse cliente.");
+            return;
+        }
+        if (!Dialogos.mostrarCliente(view, ficha)) {
+            return;
+        }
+        String[] valores = null;
+        while (true) {
+            geeks.view.FormEditarCliente form = Dialogos.editarCliente(view, ficha, valores);
+            if (form == null) {
+                return;
+            }
+            valores = form.getValores();
+            try {
+                Cliente c = model.atualizarCliente(idCliente, valores[0], valores[1], valores[2], valores[3], valores[5],
+                        valores[6], valores[4]);
+                atualizarHistorico();
+                atualizarSessoes();
+                Dialogos.sucesso(view, "Cadastro de " + c.getNome() + " atualizado.");
+                return;
+            } catch (IllegalArgumentException ex) {
+                Dialogos.erro(view, ex.getMessage()); // volta para o formulário com o que foi digitado
+            }
+        }
+    }
+
     // ---------- Sair e avisos ----------
 
     /** Volta para a tela de login (ex.: o atendente sai e o gerente entra no mesmo computador). */
@@ -215,9 +300,15 @@ public class GeeksController {
         }
         List<String> avisos = new java.util.ArrayList<>();
         for (Sessao s : model.sessoesParaAvisar(Regras.ALERTA_RESERVA_MINUTOS)) {
+            String quem = s.getCliente().getNome() + " em " + s.getDispositivo().getNome();
+            if (s.getPrevisto() == null) {
+                avisos.add(quem + ": tempo livre aberto há " + Formatador.duracao(s.getDuracao())
+                        + ". O cliente ainda está jogando? Se já foi embora, encerre a sessão"
+                        + (gerente ? " informando a saída real." : " (o gerente pode corrigir o horário de saída)."));
+                continue;
+            }
             long falta = java.time.Duration.between(LocalDateTime.now(), s.getPrevisto()).toMinutes();
-            avisos.add(s.getCliente().getNome() + " em " + s.getDispositivo().getNome()
-                    + (falta > 0 ? ": o tempo acaba em " + falta + " min (" + s.getPrevisto().toLocalTime().withNano(0) + ")."
+            avisos.add(quem + (falta > 0 ? ": o tempo acaba em " + falta + " min (" + s.getPrevisto().toLocalTime().withNano(0) + ")."
                     : ": o tempo combinado acabou às " + s.getPrevisto().toLocalTime().withNano(0) + "."));
         }
         for (Reserva r : model.reservasChegando(Regras.ALERTA_RESERVA_MINUTOS)) {
@@ -318,7 +409,8 @@ public class GeeksController {
     private void atualizarSessoes() {
         List<Sessao> ativas = model.getSessoesAtivas();
         view.getPainelSessoes().atualizarSessoes(ativas);
-        view.getPainelSessoes().atualizarResumo(ativas.size(), model.getFaturamentoHoje());
+        // o total recebido no dia é informação do gerente (o atendente não vê)
+        view.getPainelSessoes().atualizarResumo(ativas.size(), gerente ? model.getFaturamentoHoje() : BigDecimal.ZERO);
     }
 
     private void atualizarReservas() {
@@ -363,13 +455,18 @@ public class GeeksController {
             return;
         }
         FormEncerrarSessao form = Dialogos.confirmarEncerramento(view, sessao, model.getFormasPagamento(),
-                usarCredito -> model.previaEncerramento(id, usarCredito));
+                (usarCredito, saida) -> model.previaEncerramento(id, usarCredito, saida), gerente);
         if (form == null) {
             return;
         }
         String forma = form.getFormaPagamento();
         boolean usarCredito = form.isUsarCredito();
         LocalDateTime fimMostrado = form.getFimMostrado();
+        if (!gerente && fimMostrado.isBefore(LocalDateTime.now().minusMinutes(Regras.TOLERANCIA_CORRECAO_MINUTOS - 5))) {
+            Dialogos.info(view, "A janela de encerramento ficou aberta muito tempo e o valor mudou. "
+                    + "Clique em Encerrar sessão de novo para ver o valor atualizado.");
+            return;
+        }
         // o cartão some com animação e só então a sessão é encerrada e as telas atualizadas
         view.getPainelSessoes().animarSaida(id, () -> {
             try {
@@ -386,6 +483,24 @@ public class GeeksController {
                 atualizarHistorico();
             }
         });
+    }
+
+    private void maisTempo(String id) {
+        Sessao sessao = model.getSessoesAtivas().stream().filter(s -> s.getId().equals(id)).findFirst().orElse(null);
+        if (sessao == null || sessao.getPrevisto() == null) {
+            return;
+        }
+        Integer minutos = Dialogos.pedirMaisTempo(view, sessao);
+        if (minutos == null) {
+            return;
+        }
+        try {
+            LocalDateTime novo = model.acrescentarTempo(id, minutos);
+            atualizarSessoes();
+            Dialogos.sucesso(view, sessao.getCliente().getNome() + " agora joga até " + novo.toLocalTime().withSecond(0) + ".");
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            Dialogos.erro(view, ex.getMessage());
+        }
     }
 
     // ---------- Reservas ----------
@@ -427,6 +542,21 @@ public class GeeksController {
     private void cancelarReserva() {
         Reserva r = escolherReservaDoDia("Cancelar reserva", "Selecione a reserva que deseja cancelar:", "Continuar");
         if (r == null) {
+            return;
+        }
+        if (!r.getDataHora().isAfter(LocalDateTime.now())) {
+            // o horário já passou: o cliente não veio (não é cancelamento; a entrada paga fica com a loja)
+            String msg = "O horário da reserva de " + r.getCliente().getNome() + " em " + r.getDispositivo().getNome()
+                    + " (" + r.getDataHora().toLocalTime() + ") já passou. Marcar como NÃO COMPARECEU? "
+                    + "Se ele pagou entrada, ela fica com a loja.";
+            if (Dialogos.confirmar(view, "Não compareceu", msg, "Não compareceu", true)) {
+                try {
+                    model.marcarNaoCompareceu(r);
+                } catch (IllegalStateException ex) {
+                    Dialogos.erro(view, ex.getMessage());
+                }
+                atualizarReservas();
+            }
             return;
         }
         String msg = "Cancelar a reserva de " + r.getCliente().getNome() + " em " + r.getDispositivo().getNome()

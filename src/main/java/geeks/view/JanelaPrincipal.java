@@ -39,6 +39,7 @@ public class JanelaPrincipal extends JFrame {
     public static final String CADASTROS = "CADASTROS";
     public static final String FATURAMENTO = "FATURAMENTO";
     public static final String FUNCIONARIOS = "FUNCIONARIOS";
+    public static final String CAIXA = "CAIXA";
 
     private final CardLayout cartas = new CardLayout();
     private final JPanel conteudo = new JPanel(cartas);
@@ -49,6 +50,7 @@ public class JanelaPrincipal extends JFrame {
     private final boolean gerente;
     private PainelFaturamento painelFaturamento;
     private PainelFuncionarios painelFuncionarios;
+    private PainelCaixa painelCaixa;
     private final JLabel lbUsuario = Componentes.rotulo(" ", Font.PLAIN, 14, Tema.BRANCO);
     private final BotaoGeeks btSair = new BotaoGeeks("Sair", Icone.Tipo.SETA_ESQUERDA, BotaoGeeks.Estilo.CONTORNO);
     private Timer timerRelogio;
@@ -78,6 +80,8 @@ public class JanelaPrincipal extends JFrame {
         if (gerente) {
             painelFaturamento = new PainelFaturamento();
             registrar(FATURAMENTO, painelFaturamento);
+            painelCaixa = new PainelCaixa();
+            registrar(CAIXA, painelCaixa);
             painelFuncionarios = new PainelFuncionarios();
             registrar(FUNCIONARIOS, painelFuncionarios);
         }
@@ -91,6 +95,7 @@ public class JanelaPrincipal extends JFrame {
         setMinimumSize(new Dimension(1100, 650));
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
+        setExtendedState(JFrame.MAXIMIZED_BOTH); // abre ocupando a tela toda (ao restaurar, volta a 1280x720 no centro)
     }
 
     private void registrar(String chave, PainelPagina painel) {
@@ -120,6 +125,7 @@ public class JanelaPrincipal extends JFrame {
         adicionarItem(menu, CADASTROS, "Cadastros", Icone.Tipo.USUARIO_MAIS);
         if (gerente) {
             adicionarItem(menu, FATURAMENTO, "Faturamento", Icone.Tipo.MOEDA);
+            adicionarItem(menu, CAIXA, "Caixa", Icone.Tipo.LISTA);
             adicionarItem(menu, FUNCIONARIOS, "Funcionários", Icone.Tipo.CADEADO);
         }
         menu.add(Box.createVerticalGlue());
@@ -240,6 +246,11 @@ public class JanelaPrincipal extends JFrame {
     /** Só existe quando o usuário logado é gerente (senão devolve null). */
     public PainelFaturamento getPainelFaturamento() {
         return painelFaturamento;
+    }
+
+    /** Só existe quando o usuário logado é gerente (senão devolve null). */
+    public PainelCaixa getPainelCaixa() {
+        return painelCaixa;
     }
 
     /** Só existe quando o usuário logado é gerente (senão devolve null). */

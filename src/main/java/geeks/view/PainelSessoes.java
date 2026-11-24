@@ -37,6 +37,7 @@ public class PainelSessoes extends PainelPagina {
     private Timer timerValor;
     private ActionListener listenerEncerrar;
     private ActionListener listenerNova;
+    private ActionListener listenerMaisTempo;
 
     public PainelSessoes() {
         super("Sessões ativas");
@@ -79,6 +80,11 @@ public class PainelSessoes extends PainelPagina {
         grade.add(criarCartaoNova());
         grade.revalidate();
         grade.repaint();
+    }
+
+    /** A pílula "R$ X hoje" só aparece para o gerente. */
+    public void setMostrarFaturamento(boolean mostrar) {
+        pilulaFaturamento.setVisible(mostrar);
     }
 
     public void atualizarResumo(int ativas, BigDecimal faturamentoHoje) {
@@ -186,10 +192,24 @@ public class PainelSessoes extends PainelPagina {
         if (listenerEncerrar != null) {
             encerrar.addActionListener(listenerEncerrar);
         }
+        JComponent rodape = encerrar;
+        if (s.getPrevisto() != null) {
+            // tempo fechado: o cliente pode pedir mais tempo sem encerrar e abrir outra sessão
+            BotaoGeeks mais = new BotaoGeeks("Mais tempo", Icone.Tipo.MAIS, BotaoGeeks.Estilo.ESCURO);
+            mais.setActionCommand(s.getId());
+            if (listenerMaisTempo != null) {
+                mais.addActionListener(listenerMaisTempo);
+            }
+            encerrar.setText("Encerrar");
+            JPanel dois = Componentes.transparente(new GridLayout(1, 2, 8, 0));
+            dois.add(mais);
+            dois.add(encerrar);
+            rodape = dois;
+        }
 
         cartao.add(topo, BorderLayout.NORTH);
         cartao.add(meio, BorderLayout.CENTER);
-        cartao.add(encerrar, BorderLayout.SOUTH);
+        cartao.add(rodape, BorderLayout.SOUTH);
         cartao.ativarHover();
         return cartao;
     }
@@ -211,5 +231,10 @@ public class PainelSessoes extends PainelPagina {
 
     public void addListenerEncerrarSessao(ActionListener listener) {
         this.listenerEncerrar = listener;
+    }
+
+    /** O actionCommand do evento é o id da sessão ("S" + número). Só aparece em sessões de tempo fechado. */
+    public void addListenerMaisTempo(ActionListener listener) {
+        this.listenerMaisTempo = listener;
     }
 }

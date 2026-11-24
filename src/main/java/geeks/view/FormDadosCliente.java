@@ -22,7 +22,8 @@ public class FormDadosCliente extends FormularioGeeks {
     private final Componentes.BlocoIcone avatar;
 
     public FormDadosCliente(FichaCliente f) {
-        super("Dados do usuário", "Fechar", Icone.Tipo.CHECK, false);
+        super("Dados do usuário", "Editar dados", Icone.Tipo.LAPIS, true);
+        setTextoCancelar("Fechar");
         Cliente c = f.getCliente();
         avatar = new Componentes.BlocoIcone(Icone.Tipo.USUARIO_MAIS, Tema.AMARELO, Tema.FUNDO, 72, true).comMargem(8);
 

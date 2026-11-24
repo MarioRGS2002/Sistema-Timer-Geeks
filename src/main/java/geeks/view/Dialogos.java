@@ -72,9 +72,23 @@ public final class Dialogos {
 
     /** Formulário confirmado (forma de pagamento e uso do crédito), ou null se cancelar. */
     public static FormEncerrarSessao confirmarEncerramento(Component pai, Sessao sessao, List<String> formas,
-                                                           java.util.function.Function<Boolean, geeks.model.PreviaEncerramento> previa) {
-        FormEncerrarSessao form = new FormEncerrarSessao(sessao, formas, previa);
+                                                           java.util.function.BiFunction<Boolean, java.time.LocalDateTime,
+                                                                   geeks.model.PreviaEncerramento> previa,
+                                                           boolean podeCorrigirSaida) {
+        FormEncerrarSessao form = new FormEncerrarSessao(sessao, formas, previa, podeCorrigirSaida);
         return exibir(pai, "Encerrar sessão", form) ? form : null;
+    }
+
+    /** {valor digitado, motivo} do estorno, ou null se cancelar. */
+    public static String[] pedirEstorno(Component pai, geeks.dados.CaixaDAO.Pagamento p) {
+        FormEstorno form = new FormEstorno(p);
+        return exibir(pai, "Estornar pagamento", form) ? new String[]{form.getValor(), form.getMotivo()} : null;
+    }
+
+    /** Minutos a acrescentar numa sessão de tempo fechado, ou null se cancelar. */
+    public static Integer pedirMaisTempo(Component pai, Sessao sessao) {
+        FormAcrescentarTempo form = new FormAcrescentarTempo(sessao);
+        return exibir(pai, "Mais tempo", form) ? form.getMinutos() : null;
     }
 
     /** Escolha da forma de pagamento de um valor (ex.: mensalidade do Clube). Retorna a forma ou null. */
@@ -103,8 +117,15 @@ public final class Dialogos {
         exibir(pai, "Atenção", new FormMensagem("Atenção", mensagem, FormMensagem.Tom.ALERTA, Icone.Tipo.ALERTA, "Entendi", false));
     }
 
-    public static void mostrarCliente(Component pai, geeks.model.FichaCliente ficha) {
-        exibir(pai, "Dados do usuário", new FormDadosCliente(ficha));
+    /** Mostra a ficha; devolve true se o usuário clicou em "Editar dados". */
+    public static boolean mostrarCliente(Component pai, geeks.model.FichaCliente ficha) {
+        return exibir(pai, "Dados do usuário", new FormDadosCliente(ficha));
+    }
+
+    /** Formulário de edição preenchido, ou null se cancelar. */
+    public static FormEditarCliente editarCliente(Component pai, geeks.model.FichaCliente ficha, String[] valores) {
+        FormEditarCliente form = new FormEditarCliente(ficha, valores);
+        return exibir(pai, "Editar cliente", form) ? form : null;
     }
 
     /** Escolher entre vários clientes com nome parecido (busca do Clube). Retorna o escolhido ou null. */

@@ -15,7 +15,7 @@ import javax.swing.text.JTextComponent;
  * </ul>
  */
 public enum Mascara {
-    TELEFONE(11), CPF(11), DATA(8);
+    TELEFONE(11), CPF(11), DATA(8), HORA(4);
 
     private final int maxDigitos;
 
@@ -35,6 +35,8 @@ public enum Mascara {
                         + sep(d, 9, "-") + grupo(d, 9, 11);
             case DATA:
                 return grupo(d, 0, 2) + sep(d, 2, "/") + grupo(d, 2, 4) + sep(d, 4, "/") + grupo(d, 4, 8);
+            case HORA:
+                return grupo(d, 0, 2) + sep(d, 2, ":") + grupo(d, 2, 4);
             default:
                 if (d.isEmpty()) {
                     return "";
