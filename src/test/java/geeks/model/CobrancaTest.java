@@ -20,6 +20,17 @@ class CobrancaTest {
     }
 
     @Test
+    void abertaPorEnganoEncerradaEmAteDoisMinutosNaoCobra() {
+        Cobranca engano = Cobranca.calcular(TipoTempo.ABERTO, T0, null, T0.plusSeconds(90), DEZ, 3600, 600);
+        assertEquals(new BigDecimal("0.00"), engano.getValor());
+        assertEquals(0, engano.getSegundosGratis(), "não gasta a hora grátis");
+        assertEquals(0, engano.getSegundosCredito(), "não gasta crédito");
+        assertEquals(0, engano.getMinutosCredito());
+        Cobranca jogou = Cobranca.calcular(TipoTempo.ABERTO, T0, null, T0.plusMinutes(3), DEZ, 0);
+        assertEquals(DEZ, jogou.getValor(), "passou da tolerância: mínimo de 1 hora");
+    }
+
+    @Test
     void abertoDepoisDaPrimeiraHoraEProporcional() {
         Cobranca c = Cobranca.calcular(TipoTempo.ABERTO, T0, null, T0.plusMinutes(90), DEZ, 0);
         assertEquals(new BigDecimal("15.00"), c.getValor());

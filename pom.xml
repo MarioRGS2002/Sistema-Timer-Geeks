@@ -14,7 +14,7 @@
         <maven.compiler.release>17</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
-        <flyway.version>10.20.1</flyway.version>
+        <flyway.version>13.12.2</flyway.version>
         <junit.version>5.11.3</junit.version>
         <!-- Testes que usam MySQL têm @Tag("db"): ficam fora do build padrão
              (mvn package funciona com o MySQL desligado). Rodar com: mvn verify -Pdb -->

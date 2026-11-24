@@ -16,6 +16,7 @@ import java.time.LocalDateTime;
  *   <li>Tempo FECHADO: paga o tempo contratado (horario_previsto - inicio) menos a parte
  *       grátis e o crédito usado; o que foi pago e não usado vira crédito.</li>
  *   <li>Se todo o tempo usado foi grátis/crédito, nada é cobrado (sem mínimo).</li>
+ *   <li>Sessão encerrada em até 2 minutos (Regras.TOLERANCIA_ENGANO_SEGUNDOS) foi aberta por engano: não cobra.</li>
  *   <li>PREMISSA A CONFIRMAR COM A LOJA: depois da 1ª hora, o ABERTO é cobrado
  *       proporcionalmente ao tempo usado (por segundo, arredondado ao centavo).</li>
  * </ul>
@@ -52,6 +53,10 @@ public final class Cobranca {
     public static Cobranca calcular(TipoTempo tipo, LocalDateTime inicio, LocalDateTime previsto, LocalDateTime fim,
                                     BigDecimal valorHora, int gratisDisponivel, int creditoDisponivel) {
         long usados = Math.max(0, Duration.between(inicio, fim).getSeconds());
+        if (usados <= Regras.TOLERANCIA_ENGANO_SEGUNDOS) {
+            // aberta por engano e encerrada logo em seguida: não cobra e não gasta hora grátis nem crédito
+            return new Cobranca(usados, 0, 0, 0, 0, BigDecimal.ZERO.setScale(2));
+        }
         int gratis = (int) Math.min(Math.max(0, Math.min(gratisDisponivel, SEGUNDOS_HORA)), usados);
         int credito = (int) Math.min(Math.max(0, creditoDisponivel), usados - gratis);
         long pagoUsado = usados - gratis - credito;

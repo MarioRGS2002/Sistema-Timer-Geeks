@@ -11,6 +11,8 @@ public final class Regras {
     public static final int JANELA_MINUTOS = Integer.getInteger("geeks.janelaMinutos", 60);
     /** Aviso de reserva próxima, em minutos antes do início. */
     public static final int ALERTA_RESERVA_MINUTOS = Integer.getInteger("geeks.alertaReservaMinutos", 10);
+    /** Sessão encerrada em até estes segundos foi aberta por engano: não cobra nem gasta hora grátis/crédito. */
+    public static final int TOLERANCIA_ENGANO_SEGUNDOS = Integer.getInteger("geeks.toleranciaEnganoSegundos", 120);
     /** Sessão de tempo livre com mais horas que isto gera aviso ("o cliente ainda está aí?"). */
     public static final int SESSAO_LONGA_HORAS = Integer.getInteger("geeks.sessaoLongaHoras", 6);
     /** Encerrar com horário de saída mais antigo que isto (minutos) é correção: só o gerente. */
