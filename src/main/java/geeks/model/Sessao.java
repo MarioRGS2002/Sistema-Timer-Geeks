@@ -67,6 +67,25 @@ public class Sessao {
         return entradaPaga;
     }
 
+    private java.util.List<String> jogadores = java.util.List.of();
+    private int maxJogadores = 1;
+
+    /** Acompanhantes (além do titular) e o máximo de jogadores do equipamento. */
+    void definirJogadores(java.util.List<String> nomes, int maximo) {
+        this.jogadores = nomes == null ? java.util.List.of() : java.util.List.copyOf(nomes);
+        this.maxJogadores = Math.max(1, maximo);
+    }
+
+    /** Nomes dos jogadores que estão junto com o titular. */
+    public java.util.List<String> getJogadores() {
+        return jogadores;
+    }
+
+    /** Ainda cabe mais alguém nesta sessão? */
+    public boolean cabeMaisJogador() {
+        return isAtiva() && 1 + jogadores.size() < maxJogadores;
+    }
+
     public boolean isAtiva() {
         return fim == null;
     }

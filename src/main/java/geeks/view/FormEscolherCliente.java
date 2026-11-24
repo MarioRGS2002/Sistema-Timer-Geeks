@@ -11,11 +11,15 @@ public class FormEscolherCliente extends FormularioGeeks {
     private final SeletorCliente seletor;
 
     public FormEscolherCliente(String termo, List<Cliente> clientes) {
-        super("Escolher cliente", "Escolher", Icone.Tipo.CHECK);
+        this("Escolher cliente", clientes.size() + " clientes com “" + termo + "”", "Escolher", clientes);
+    }
+
+    /** Versão genérica (ex.: "Adicionar jogador"). */
+    public FormEscolherCliente(String titulo, String tituloLista, String textoConfirmar, List<Cliente> clientes) {
+        super(titulo, textoConfirmar, Icone.Tipo.CHECK);
         seletor = new SeletorCliente(clientes, 4);
         JPanel envolve = Componentes.transparente(new BorderLayout());
-        envolve.add(bloco(clientes.size() + " clientes com “" + termo + "”", Icone.Tipo.USUARIO_MAIS, seletor),
-                BorderLayout.NORTH);
+        envolve.add(bloco(tituloLista, Icone.Tipo.USUARIO_MAIS, seletor), BorderLayout.NORTH);
         getCorpo().add(envolve, BorderLayout.CENTER);
         seletor.addListenerSelecao(this::atualizar);
         atualizar();

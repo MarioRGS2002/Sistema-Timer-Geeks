@@ -28,17 +28,44 @@ public class SessaoDAO {
         public int segundosGratis;
         /** Entrada paga na reserva que virou esta sessão (0 se não veio de reserva). */
         public BigDecimal entradaPaga;
+        /** Máximo de jogadores do tipo de equipamento (titular + acompanhantes). */
+        public int maxParticipantes;
+    }
+
+    /** Acrescenta um jogador (não titular) à sessão ativa. */
+    public void adicionarJogador(Connection c, int idSessao, int idCliente) throws SQLException {
+        Sql.atualizar(c, "INSERT INTO participante_sessao (id_sessao, id_cliente, titular, segundos_gratis) VALUES (?, ?, 0, 0)",
+                idSessao, idCliente);
+    }
+
+    /** Nomes dos jogadores acompanhantes (não titulares) de cada sessão ativa: {id_sessao, nome}. */
+    public java.util.Map<Integer, List<String>> jogadoresAtivos(Connection c) throws SQLException {
+        java.util.Map<Integer, List<String>> m = new java.util.HashMap<>();
+        try (PreparedStatement ps = Sql.preparar(c, "SELECT ps.id_sessao, cl.nome FROM participante_sessao AS ps "
+                + "INNER JOIN sessao AS s ON s.id_sessao = ps.id_sessao "
+                + "INNER JOIN cliente AS cl ON cl.id_cliente = ps.id_cliente "
+                + "WHERE ps.titular = 0 AND s.horario_fim IS NULL ORDER BY cl.nome");
+             ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                m.computeIfAbsent(rs.getInt(1), k -> new java.util.ArrayList<>()).add(rs.getString(2));
+            }
+        }
+        return m;
+    }
+
+    public int participantes(Connection c, int idSessao) throws SQLException {
+        return (int) Sql.contar(c, "SELECT COUNT(*) FROM participante_sessao WHERE id_sessao = ?", idSessao);
     }
 
     private static final String BASE = "SELECT s.id_sessao, s.horario_inicio, s.horario_previsto, s.horario_fim, "
             + "s.tipo_tempo, s.valor_hora_contratado, s.valor_total_devido, s.id_equipamento, e.id_tipo, "
-            + "ps.id_cliente, ps.segundos_gratis, "
+            + "ps.id_cliente, ps.segundos_gratis, t.max_participantes, "
             + "(SELECT COALESCE(SUM(p.valor_pago), 0) FROM reserva AS r "
             + "  INNER JOIN pagamento AS p ON p.id_reserva = r.id_reserva WHERE r.id_sessao = s.id_sessao) AS entrada_paga "
             + "FROM sessao AS s "
             + "INNER JOIN equipamento AS e ON e.id_equipamento = s.id_equipamento "
             + "INNER JOIN tipo_equipamento AS t ON t.id_tipo = e.id_tipo "
-            + "INNER JOIN participante_sessao AS ps ON ps.id_sessao = s.id_sessao "
+            + "INNER JOIN participante_sessao AS ps ON ps.id_sessao = s.id_sessao AND ps.titular = 1 "
             + "INNER JOIN cliente AS c ON c.id_cliente = ps.id_cliente ";
 
     public int abrir(Connection c, String tipoTempo, LocalDateTime inicio, LocalDateTime previsto,
@@ -160,6 +187,7 @@ public class SessaoDAO {
                 l.valorTotal = rs.getBigDecimal("valor_total_devido");
                 l.segundosGratis = rs.getInt("segundos_gratis");
                 l.entradaPaga = rs.getBigDecimal("entrada_paga");
+                l.maxParticipantes = rs.getInt("max_participantes");
                 lista.add(l);
             }
         }
