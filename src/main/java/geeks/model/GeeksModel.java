@@ -64,6 +64,48 @@ public class GeeksModel {
      */
     public Cliente cadastrarCliente(String nome, String nascimentoTxt, String telefone, String cpf,
                                     String respNome, String respCpf, String respTelefone, String respParentesco) {
+        DadosCliente d = validarCliente(nome, nascimentoTxt, telefone, cpf, respNome, respCpf, respTelefone, respParentesco);
+        LocalDate hoje = LocalDate.now();
+        return Transacao.executar(c -> {
+            if (clienteDAO.existeCpf(c, d.cpf())) {
+                throw new IllegalArgumentException("Já existe um cliente cadastrado com esse CPF.");
+            }
+            int id = clienteDAO.inserir(c, d.nome(), d.nascimento(), d.tel(), d.cpf());
+            if (d.temResponsavel()) {
+                clienteDAO.inserirResponsavel(c, id, d.rNome(), d.rCpf(), d.rTel(), d.rPar());
+            }
+            return clienteDAO.porId(c, id, hoje).orElseThrow();
+        });
+    }
+
+    /**
+     * Corrige o cadastro (nome, nascimento, telefone e responsável). O CPF não muda: é a identidade
+     * do cliente. As mesmas regras do cadastro valem aqui.
+     */
+    public Cliente atualizarCliente(int idCliente, String nome, String nascimentoTxt, String telefone,
+                                    String respNome, String respCpf, String respTelefone, String respParentesco) {
+        LocalDate hoje = LocalDate.now();
+        Cliente atual = Transacao.consultar(c -> clienteDAO.porId(c, idCliente, hoje).orElse(null));
+        if (atual == null) {
+            throw new IllegalArgumentException("Cliente não encontrado.");
+        }
+        DadosCliente d = validarCliente(nome, nascimentoTxt, telefone, atual.getCpf(), respNome, respCpf, respTelefone, respParentesco);
+        return Transacao.executar(c -> {
+            clienteDAO.atualizar(c, idCliente, d.nome(), d.nascimento(), d.tel());
+            if (d.temResponsavel()) {
+                clienteDAO.salvarResponsavel(c, idCliente, d.rNome(), d.rCpf(), d.rTel(), d.rPar());
+            }
+            return clienteDAO.porId(c, idCliente, hoje).orElseThrow();
+        });
+    }
+
+    /** Dados do cliente já conferidos (mesmas regras para cadastrar e editar). */
+    private record DadosCliente(String nome, LocalDate nascimento, String tel, String cpf, boolean temResponsavel,
+                                String rNome, String rCpf, String rTel, String rPar) {
+    }
+
+    private DadosCliente validarCliente(String nome, String nascimentoTxt, String telefone, String cpf,
+                                        String respNome, String respCpf, String respTelefone, String respParentesco) {
         if (nome == null || nome.isBlank()) {
             throw new IllegalArgumentException("Informe o nome do cliente.");
         }
@@ -115,16 +157,7 @@ public class GeeksModel {
                 throw new IllegalArgumentException("Parentesco grande demais (até 50 caracteres).");
             }
         }
-        return Transacao.executar(c -> {
-            if (clienteDAO.existeCpf(c, cpfNumeros)) {
-                throw new IllegalArgumentException("Já existe um cliente cadastrado com esse CPF.");
-            }
-            int id = clienteDAO.inserir(c, nome.trim(), nascimento, tel, cpfNumeros);
-            if (temResponsavel) {
-                clienteDAO.inserirResponsavel(c, id, rNome, rCpf, rTel, rPar);
-            }
-            return clienteDAO.porId(c, id, hoje).orElseThrow();
-        });
+        return new DadosCliente(nome.trim(), nascimento, tel, cpfNumeros, temResponsavel, rNome, rCpf, rTel, rPar);
     }
 
     /** dd/mm/aaaa, d/m/aaaa ou só os 8 números (ddmmaaaa). null se inválida. */
@@ -338,9 +371,84 @@ public class GeeksModel {
      * crédito usado/gerado, entrada já paga na reserva e o valor a pagar. Não grava nada.
      */
     public PreviaEncerramento previaEncerramento(String id, boolean usarCredito) {
+        return previaEncerramento(id, usarCredito, null);
+    }
+
+    /**
+     * @param saidaReal horário real em que o cliente saiu (sessão esquecida aberta); null = agora.
+     *                  Só o gerente pode informar (é correção de cobrança).
+     */
+    public PreviaEncerramento previaEncerramento(String id, boolean usarCredito, LocalDateTime saidaReal) {
         int idSessao = idNumerico(id, "S");
-        LocalDateTime fim = LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS);
-        return Transacao.consultar(c -> calcularEncerramento(c, sessaoDAO.travarAtiva(c, idSessao), fim, usarCredito));
+        LocalDateTime agora = LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS);
+        if (saidaReal != null) {
+            Contexto.exigirGerente();
+        }
+        return Transacao.consultar(c -> {
+            SessaoDAO.Linha s = sessaoDAO.travarAtiva(c, idSessao);
+            LocalDateTime fim = saidaReal == null ? agora : validarSaida(saidaReal, s.inicio, agora);
+            return calcularEncerramento(c, s, fim, usarCredito);
+        });
+    }
+
+    /**
+     * Acrescenta tempo a uma sessão de TEMPO FECHADO (o cliente quer jogar mais). Conta a partir do
+     * fim combinado (ou de agora, se ele já passou). Recusa se bater na reserva de outro cliente.
+     * @return o novo horário de fim
+     */
+    public LocalDateTime acrescentarTempo(String id, int minutos) {
+        if (minutos < 15 || minutos > 8 * 60) {
+            throw new IllegalArgumentException("Escolha de 15 minutos a 8 horas.");
+        }
+        int idSessao = idNumerico(id, "S");
+        LocalDateTime agora = LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS);
+        return Transacao.executar(c -> {
+            SessaoDAO.Linha s = sessaoDAO.travarAtiva(c, idSessao);
+            if (s.previsto == null) {
+                throw new IllegalStateException("Sessão de tempo livre não precisa de mais tempo: ela segue até ser encerrada.");
+            }
+            equipamentoDAO.travar(c, s.idEquipamento);
+            LocalDateTime base = s.previsto.isAfter(agora) ? s.previsto : agora;
+            LocalDateTime novo = base.plusMinutes(minutos);
+            Optional<ReservaDAO.Linha> prox = reservaDAO.proximaAtiva(c, s.idEquipamento, agora);
+            if (prox.isPresent() && prox.get().idCliente != s.idCliente
+                    && prox.get().inicio.isBefore(novo.plusMinutes(Regras.JANELA_MINUTOS))) {
+                Dispositivo d = dispositivoPorId.get(s.idEquipamento);
+                List<String> livres = equipamentoDAO.livresMesmoTipo(c, s.idEquipamento, agora, novo, agora, Regras.JANELA_MINUTOS);
+                throw new IllegalStateException("Não dá para acrescentar: " + (d == null ? "o equipamento" : d.getNome())
+                        + " tem reserva às " + prox.get().inicio.toLocalTime() + "." + sugestao(livres));
+            }
+            sessaoDAO.definirPrevisto(c, idSessao, novo);
+            return novo;
+        });
+    }
+
+    /**
+     * Reserva em que o cliente não veio: status NAO_COMPARECEU (não é cancelamento; a entrada paga,
+     * se houver, fica com a loja). Só depois do horário de início.
+     */
+    public void marcarNaoCompareceu(Reserva reserva) {
+        if (reserva.getDataHora().isAfter(LocalDateTime.now())) {
+            throw new IllegalStateException("A reserva ainda não começou. Para desistir antes do horário, use Cancelar.");
+        }
+        Transacao.executar(c -> {
+            if (reservaDAO.marcarNaoCompareceu(c, reserva.getIdReserva()) != 1) {
+                throw new IllegalStateException("Essa reserva não está mais ativa.");
+            }
+            return null;
+        });
+    }
+
+    private static LocalDateTime validarSaida(LocalDateTime saida, LocalDateTime inicio, LocalDateTime agora) {
+        LocalDateTime s = saida.truncatedTo(ChronoUnit.SECONDS);
+        if (s.isAfter(agora)) {
+            throw new IllegalArgumentException("O horário de saída não pode estar no futuro.");
+        }
+        if (s.isBefore(inicio)) {
+            throw new IllegalArgumentException("O horário de saída é antes do início da sessão ("
+                    + inicio.toLocalTime().withSecond(0) + ").");
+        }
+        return s;
     }
 
     /**
@@ -362,7 +470,21 @@ public class GeeksModel {
         int idFuncionario = Contexto.idFuncionario();
         LocalDateTime agora = LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS);
         LocalDateTime fim = fimMostrado == null || fimMostrado.isAfter(agora) ? agora : fimMostrado;
-        return Transacao.executar(c -> encerrar(c, idSessao, fim, idFuncionario, formaPagamento, usarCredito));
+        // saída bem antes de agora = correção de sessão esquecida aberta: só o gerente, e fica registrado quem fez
+        boolean correcao = fim.isBefore(agora.minusMinutes(Regras.TOLERANCIA_CORRECAO_MINUTOS));
+        if (correcao) {
+            Contexto.exigirGerente();
+        }
+        return Transacao.executar(c -> {
+            if (correcao) {
+                validarSaida(fim, sessaoDAO.travarAtiva(c, idSessao).inicio, agora);
+            }
+            PreviaEncerramento r = encerrar(c, idSessao, fim, idFuncionario, formaPagamento, usarCredito);
+            if (correcao) {
+                sessaoDAO.definirFimCorrigidoPor(c, idSessao, idFuncionario);
+            }
+            return r;
+        });
     }
 
     /** Encerramento em uma conexão já em transação (usado também pelos testes). */
@@ -381,12 +503,18 @@ public class GeeksModel {
             sessaoDAO.definirCredito(c, idSessao, s.idCliente, cob.getSegundosCredito());
             creditoDAO.consumir(c, s.idCliente, s.idTipo, cob.getMinutosCreditoUsados(), fim.toLocalDate());
         }
+        // A sessão guarda a saída (real ou corrigida); o pagamento guarda QUANDO o dinheiro foi recebido
+        // (agora). Assim, corrigir a saída de uma sessão esquecida põe o valor no caixa de hoje.
+        LocalDateTime recebido = LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS);
+        if (recebido.isBefore(fim)) {
+            recebido = fim;
+        }
         if (cob.getSegundosGratis() > 0) {
-            pagamentoDAO.registrar(c, fim, BigDecimal.ZERO.setScale(2), "SAIDA", PagamentoDAO.SESSAO, null,
+            pagamentoDAO.registrar(c, recebido, BigDecimal.ZERO.setScale(2), "SAIDA", PagamentoDAO.SESSAO, null,
                     idFuncionario, idSessao, null, null);
         }
         if (r.getAPagar().signum() > 0) {
-            pagamentoDAO.registrar(c, fim, r.getAPagar(), "SAIDA", PagamentoDAO.SESSAO,
+            pagamentoDAO.registrar(c, recebido, r.getAPagar(), "SAIDA", PagamentoDAO.SESSAO,
                     idForma(c, formaPagamento), idFuncionario, idSessao, null, null);
         }
         if (cob.getMinutosCredito() > 0) {
@@ -443,8 +571,10 @@ public class GeeksModel {
      */
     public List<Sessao> sessoesParaAvisar(int minutos) {
         LocalDateTime limite = LocalDateTime.now().plusMinutes(minutos);
+        LocalDateTime longaDesde = LocalDateTime.now().minusHours(Regras.SESSAO_LONGA_HORAS);
+        // tempo fechado acabando, ou tempo livre aberto há muitas horas (sessão esquecida?)
         List<Sessao> candidatas = getSessoesAtivas().stream()
-                .filter(s -> s.getPrevisto() != null && !s.getPrevisto().isAfter(limite))
+                .filter(s -> s.getPrevisto() != null ? !s.getPrevisto().isAfter(limite) : !s.getInicio().isAfter(longaDesde))
                 .collect(Collectors.toList());
         if (candidatas.isEmpty()) {
             return candidatas;
@@ -480,6 +610,7 @@ public class GeeksModel {
 
     /** Total recebido hoje (todos os pagamentos com data de hoje). */
     public BigDecimal getFaturamentoHoje() {
+        Contexto.exigirGerente();
         LocalDate hoje = LocalDate.now();
         return Transacao.consultar(c -> pagamentoDAO.total(c, hoje.atStartOfDay(), hoje.plusDays(1).atStartOfDay()));
     }
