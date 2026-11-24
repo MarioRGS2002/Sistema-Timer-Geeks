@@ -21,6 +21,7 @@ A estrutura é criada pelas migrations em `src/main/resources/db/migration`, apl
 | V4 `permissao_delete_reserva` | `GRANT DELETE ON reserva TO geeks_app` |
 | V5 `credito_usado` | `participante_sessao.segundos_credito`: crédito de tempo usado em cada sessão |
 | V6 `estorno_nao_compareceu` | tabela `estorno`; status `NAO_COMPARECEU` em `reserva`; `sessao.fim_corrigido_por` |
+| V7 `jogadores_da_sessao` | `participante_sessao.titular`: quem paga a sessão (1) e os acompanhantes (0) |
 
 Regras:
 - **Nunca edite uma migration já aplicada** (o Flyway recusa: `validateOnMigrate`). Mudança de estrutura = novo arquivo `V5__descricao.sql`.

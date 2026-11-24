@@ -90,7 +90,7 @@ class DiaADiaTest {
         assertEquals(new BigDecimal("15.00"), dia.total);
         assertEquals(new BigDecimal("15.00"), dia.porForma.get("PIX"));
         assertEquals(new BigDecimal("5.00"), dia.totalEstornos());
-        assertEquals(new BigDecimal("5.00"), dia.pagamentos.get(0).estornado);
+        assertEquals(new BigDecimal("5.00"), dia.pagamentos.get(0).estornado());
         assertThrows(IllegalArgumentException.class, () -> caixa.estornar(idPag, new BigDecimal("15.01"), "passa do valor"));
         assertDoesNotThrow(() -> caixa.estornar(idPag, new BigDecimal("15.00"), "devolvido o resto"));
         assertEquals(new BigDecimal("0.00"), caixa.dia(LocalDate.now()).total);

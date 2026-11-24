@@ -233,10 +233,22 @@ powershell -ExecutionPolicy Bypass -File db\backup\agendar_backup.ps1      # tod
 | Histórico | ficha "Dados do usuário" com botão **Editar dados** (nome, nascimento, telefone e responsável; o CPF não muda) |
 | Sessões | a pílula "R$ X hoje" só aparece para o gerente (o model também recusa para o atendente) |
 | Janela | o sistema abre **maximizado** |
+
+### Gestão do gerente e acabamentos (versão 1.0.5)
+
+| Onde | O que foi feito |
+|---|---|
+| Primeira configuração | **assistente com telas** (sem PowerShell) que abre sozinho num computador novo; o atalho "Configurar Sistema Geeks" abre o mesmo assistente |
+| **Loja** (só gerente) | **preços** (valor da hora de cada tipo e mensalidade do Clube; sessões já abertas mantêm o preço de quando começaram) e **equipamentos** (cadastrar, colocar em manutenção, voltar a usar; em manutenção some das telas de sessão e reserva, e avisa se havia reservas) |
+| Clube | lista de quem **vence nos próximos 7 dias ou venceu há até 7 dias** (clicar abre o cliente), chip "Clube até dd/mm/aaaa" e botão **Renovar (+1 mês)** antes de vencer |
+| Faturamento | **relatórios** do período: equipamentos mais usados, horários de pico e clientes mais frequentes |
+| Sessões | **+ Jogador**: amigos jogando junto no mesmo equipamento (até o máximo do tipo: PC 1, PlayStation 4, Switch 4, Xadrez 2). Quem paga é o titular; os acompanhantes ficam registrados e não podem estar em outra sessão (migration V7) |
+| Cobrança | sessão encerrada em até 2 minutos foi aberta **por engano**: não cobra (`geeks.toleranciaEnganoSegundos`) |
+| Banco | Flyway atualizado para a 13.12 |
 ## Decisões a confirmar com a loja
 
 - Depois da 1ª hora, o tempo ABERTO é cobrado proporcional ao uso (por segundo, arredondado ao centavo).
-- Sessão aberta e encerrada no mesmo instante (engano) não cobra nada.
+- Sessão encerrada em até 2 minutos (aberta por engano) não cobra nada.
 - Hora grátis do Clube conta pelo dia em que a sessão **começou** (sessão que cruza a meia-noite usa a do dia do início).
 - Cancelar uma reserva com entrada paga não devolve a entrada pelo sistema (devolução, se houver, é feita por fora).
 - Se a entrada paga for maior que o valor final da sessão, a diferença não vira troco nem crédito.
