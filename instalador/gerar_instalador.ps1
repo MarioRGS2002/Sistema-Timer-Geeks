@@ -72,11 +72,11 @@ $bw.Write([byte]0); $bw.Write([byte]0); $bw.Write([byte]0); $bw.Write([byte]0) #
 $bw.Write([UInt16]1); $bw.Write([UInt16]32); $bw.Write([UInt32]$dados.Length); $bw.Write([UInt32]22)
 $bw.Write($dados); $bw.Close()
 
-# 4. segundo atalho: assistente de configuração (console)
+# 4. segundo atalho: assistente de configuração (janela com telas, sem console)
 $props = Join-Path $trabalho 'configurar.properties'
 @(
     'main-class=geeks.tools.ConfigurarLoja',
-    'win-console=true',
+    'win-console=false',
     'win-shortcut=false',
     'win-menu=true',
     ('icon=' + $ico.Replace('\', '/'))

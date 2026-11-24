@@ -17,6 +17,13 @@ public class MainGeeks {
     private static volatile String ultimaMensagem = "";
 
     public static void main(String[] args) {
+        Runtime.getRuntime().addShutdownHook(new Thread(Banco::fechar));
+        Thread.setDefaultUncaughtExceptionHandler(MainGeeks::tratarErro);
+        // Primeira vez neste computador: em vez de erro, abre o assistente de configuração (com telas).
+        if (!ConfigBanco.existe()) {
+            abrirAssistente();
+            return;
+        }
         // Antes do login: migrations (usuário migrator) e pool de conexões (usuário da aplicação).
         try {
             Banco.iniciar(ConfigBanco.carregar());
@@ -34,9 +41,17 @@ public class MainGeeks {
                     + "\n\nVerifique se o MySQL está ligado e se o db.properties está correto.");
             return;
         }
-        Runtime.getRuntime().addShutdownHook(new Thread(Banco::fechar));
-        Thread.setDefaultUncaughtExceptionHandler(MainGeeks::tratarErro);
         SwingUtilities.invokeLater(LoginController::new);
+    }
+
+    /**
+     * Assistente de configuração com telas (primeiro uso e atalho "Configurar Sistema Geeks").
+     * Ao terminar, o banco já está ligado e abre o login.
+     */
+    public static void abrirAssistente() {
+        Thread.setDefaultUncaughtExceptionHandler(MainGeeks::tratarErro);
+        SwingUtilities.invokeLater(() -> new geeks.tools.AssistenteConfiguracao(new geeks.tools.ServicoConfiguracao(),
+                LoginController::new).setVisible(true));
     }
 
     /** Erros de banco/permissão que escaparem das telas aparecem no diálogo de erro do sistema. */

@@ -55,7 +55,12 @@ public final class ConfigurarLoja {
     private ConfigurarLoja() {
     }
 
+    /** Sem argumentos: assistente com telas. Com "--console": o modo texto antigo (para suporte técnico). */
     public static void main(String[] args) {
+        if (!java.util.Arrays.asList(args).contains("--console")) {
+            geeks.MainGeeks.abrirAssistente();
+            return;
+        }
         ConfigurarLoja c = new ConfigurarLoja();
         int codigo = 0;
         try {

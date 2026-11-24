@@ -45,8 +45,23 @@ public final class ConfigBanco {
         return carregar("db.properties");
     }
 
+    /** Existe um db.properties em algum dos lugares onde o sistema procura? (false = primeira vez neste PC) */
+    public static boolean existe() {
+        return candidatos("db.properties").stream().anyMatch(Files::isRegularFile);
+    }
+
     /** Carrega um arquivo de configuração pelo nome (ex.: "db.test.properties"). */
     public static ConfigBanco carregar(String nomeArquivo) {
+        for (Path c : candidatos(nomeArquivo)) {
+            if (Files.isRegularFile(c)) {
+                return deArquivo(c);
+            }
+        }
+        throw new ErroBanco("O sistema ainda não foi configurado neste computador.\n"
+                + "Abra \"Configurar Sistema Geeks\" no menu Iniciar (uma vez só) e depois abra o sistema de novo.");
+    }
+
+    private static List<Path> candidatos(String nomeArquivo) {
         List<Path> candidatos = new ArrayList<>();
         String explicito = System.getProperty("geeks.db.config");
         if (explicito != null && !explicito.isBlank() && "db.properties".equals(nomeArquivo)) {
@@ -59,13 +74,7 @@ public final class ConfigBanco {
             candidatos.add(pastaJar.getParent() == null ? pastaJar.resolve(nomeArquivo) : pastaJar.getParent().resolve(nomeArquivo));
         }
         candidatos.add(pastaInstalacao().resolve(nomeArquivo));
-        for (Path c : candidatos) {
-            if (Files.isRegularFile(c)) {
-                return deArquivo(c);
-            }
-        }
-        throw new ErroBanco("O sistema ainda não foi configurado neste computador.\n"
-                + "Abra \"Configurar Sistema Geeks\" no menu Iniciar (uma vez só) e depois abra o sistema de novo.");
+        return candidatos;
     }
 
     /** Pasta da configuração na loja: %ProgramData%\SistemaGeeks (fora da pasta do programa, que é só leitura). */
