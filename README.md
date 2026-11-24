@@ -199,6 +199,22 @@ powershell -ExecutionPolicy Bypass -File db\backup\agendar_backup.ps1      # tod
 | 8 | Nova reserva | o aviso "equipamento em uso sem hora para acabar" virou pergunta **"Reservar mesmo assim?"** (sugere outro equipamento livre do mesmo tipo). Sessão de tempo fechado bloqueia reservas antes do fim + folga |
 | 9 | Encerrar sessão | a confirmação mostra **hora grátis do Clube, crédito usado, entrada já paga e crédito que sobra**; ao encerrar com sobra de crédito aparece um aviso |
 | 10 | Funcionários | tela **Funcionários** (só gerente) |
+
+### Ajustes depois do teste com o cliente
+
+| Onde | O que foi feito |
+|---|---|
+| Campos de senha | ícone de **olho** para mostrar/ocultar a senha (login, funcionário, troca de senha) |
+| Menu lateral | mostra quem está logado e o botão **Sair** (volta ao login sem fechar o sistema) |
+| Janelas (reserva, encerrar...) | podem ser redimensionadas e **rolam** quando não cabem na tela |
+| Cadastro | **máscaras**: telefone com DDD automático, CPF limitado a 11 números, data dd/mm/aaaa; telefone do responsável não pode ser o do cliente |
+| Histórico | ficha **Dados do usuário** completa (nascimento, responsável, Clube até quando, sessões, última visita, crédito), sem cortes |
+| Clube | busca por nome mostra a **lista** quando há nomes parecidos |
+| Sessões | cartão do tempo fechado mostra **até que horas e quanto falta** (laranja nos últimos 10 min, vermelho ao esgotar); valor já descontada a entrada da reserva |
+| Avisos | a cada 30 s: **tempo fechado acabando** (uma vez por sessão, marcado no banco) e **reserva chegando** (`geeks.alertaReservaMinutos`, padrão 10) |
+| Encerrar sessão | grava **o mesmo horário e valor mostrados** na janela |
+| Nova sessão | reserva de outro cliente **já em andamento** também bloqueia o equipamento |
+| Funcionários | dois gerentes desativando um ao outro ao mesmo tempo não travam o banco |
 ## Decisões a confirmar com a loja
 
 - Depois da 1ª hora, o tempo ABERTO é cobrado proporcional ao uso (por segundo, arredondado ao centavo).
