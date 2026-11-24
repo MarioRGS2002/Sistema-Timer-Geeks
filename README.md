@@ -19,16 +19,21 @@ No computador da loja não precisa de Java, Maven, Git nem PowerShell:
 1. Instale o **MySQL Server** (instalador oficial do MySQL; anote a senha do `root` que ele pedir).
 2. Instale o **7-Zip** (7-zip.org) — só para o backup automático.
 3. Rode o **`Sistema Geeks-1.0.0.exe`** (avançar, avançar, concluir).
-4. Abra **"Configurar Sistema Geeks"** no menu Iniciar (uma vez só). Ele pergunta, em ordem:
-   a senha do root do MySQL, o login/nome/senha do gerente (e outros funcionários),
-   os equipamentos da loja e se quer backup automático diário (pasta e horário).
-5. Pronto: o sistema abre pelo atalho **"Sistema Geeks"** na área de trabalho.
+4. Abra o **"Sistema Geeks"** pela área de trabalho. Na primeira vez abre sozinho o **assistente de configuração**
+   (janela com telas, sem PowerShell), que pede em ordem: a senha do MySQL (só uma vez; não fica salva),
+   o nome/login/senha do gerente, os equipamentos da loja (nome + tipo) e o backup automático diário
+   (botão "Escolher pasta" e horário). No fim mostra a senha do backup com o botão "Copiar senha".
+5. Pronto: o assistente abre o login do sistema.
+
+O mesmo assistente fica no menu Iniciar como **"Configurar Sistema Geeks"** (para acrescentar equipamentos ou
+mudar o backup); num computador já configurado ele não pede a senha do MySQL de novo.
+Modo texto antigo, para suporte técnico: `java -cp sistema-geeks.jar geeks.tools.ConfigurarLoja --console`.
 
 Funcionários: depois que o gerente existe, ele mesmo cuida da equipe pela tela **Funcionários** do sistema
 (só aparece para gerente): cadastra atendentes ou outros gerentes, troca senha (funcionário que esqueceu)
 e desativa/reativa. Ninguém consegue desativar o próprio acesso e sempre sobra pelo menos um gerente ativo.
 Desativar não apaga: o funcionário só deixa de entrar, e o histórico continua com o nome dele.
-Equipamentos novos: abra o configurador de novo (ele mantém o que já existe).
+Equipamentos novos: abra "Configurar Sistema Geeks" de novo (ele mantém o que já existe).
 A configuração fica em `C:\ProgramData\SistemaGeeks` (legível só pelo usuário do Windows que rodou o configurador:
 use o mesmo usuário do Windows para o configurador e para o sistema).
 
