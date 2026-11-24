@@ -92,6 +92,25 @@ public class ClienteDAO {
                 telefone == null || telefone.isBlank() ? null : telefone);
     }
 
+    /** Corrige nome, nascimento e telefone (o CPF não muda). */
+    public void atualizar(Connection c, int idCliente, String nome, LocalDate nascimento, String telefone) throws SQLException {
+        Sql.atualizar(c, "UPDATE cliente SET nome = ?, data_nascimento = ?, telefone = ? WHERE id_cliente = ?",
+                nome, nascimento, telefone == null || telefone.isBlank() ? null : telefone, idCliente);
+    }
+
+    /** Atualiza o primeiro responsável do cliente ou cadastra um, se não houver. */
+    public void salvarResponsavel(Connection c, int idCliente, String nome, String cpf, String telefone, String parentesco)
+            throws SQLException {
+        long id = Sql.contar(c, "SELECT COALESCE(MIN(id_responsavel), 0) FROM responsavel WHERE id_cliente = ?", idCliente);
+        if (id == 0) {
+            inserirResponsavel(c, idCliente, nome, cpf, telefone, parentesco);
+            return;
+        }
+        Sql.atualizar(c, "UPDATE responsavel SET nome = ?, cpf = ?, telefone = ?, parentesco = ? WHERE id_responsavel = ?",
+                nome, cpf, telefone == null || telefone.isBlank() ? null : telefone,
+                parentesco == null || parentesco.isBlank() ? null : parentesco, id);
+    }
+
     public int inserirResponsavel(Connection c, int idCliente, String nome, String cpf, String telefone, String parentesco)
             throws SQLException {
         return Sql.inserir(c, "INSERT INTO responsavel (id_cliente, nome, cpf, telefone, parentesco) VALUES (?, ?, ?, ?, ?)",

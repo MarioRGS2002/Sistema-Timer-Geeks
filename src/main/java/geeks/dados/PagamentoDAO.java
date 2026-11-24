@@ -49,21 +49,31 @@ public class PagamentoDAO {
                 quando, valor, momento, tipo, idForma, idFuncionario, idSessao, idReserva, idAssinatura);
     }
 
+    /**
+     * Movimento de caixa no período [ini, fim): pagamentos (positivos) e estornos (negativos, na
+     * data do estorno, com a forma do pagamento estornado). Cada lado usa o próprio índice de data.
+     * Parâmetros: ini, fim, ini, fim.
+     */
+    private static final String MOVIMENTO = "(SELECT p.data_hora_pagamento AS quando, p.valor_pago AS valor, "
+            + "p.id_forma_pagamento AS id_forma FROM pagamento AS p "
+            + "WHERE p.data_hora_pagamento >= ? AND p.data_hora_pagamento < ? "
+            + "UNION ALL SELECT e.data_hora, -e.valor, pe.id_forma_pagamento FROM estorno AS e "
+            + "INNER JOIN pagamento AS pe ON pe.id_pagamento = e.id_pagamento "
+            + "WHERE e.data_hora >= ? AND e.data_hora < ?) AS m ";
+
     public BigDecimal total(Connection c, LocalDateTime ini, LocalDateTime fim) throws SQLException {
-        try (PreparedStatement ps = Sql.preparar(c, "SELECT COALESCE(SUM(valor_pago), 0) FROM pagamento "
-                + "WHERE data_hora_pagamento >= ? AND data_hora_pagamento < ?", ini, fim);
+        try (PreparedStatement ps = Sql.preparar(c, "SELECT COALESCE(SUM(m.valor), 0) FROM " + MOVIMENTO, ini, fim, ini, fim);
              ResultSet rs = ps.executeQuery()) {
             rs.next();
-            return rs.getBigDecimal(1);
+            return rs.getBigDecimal(1).setScale(2, java.math.RoundingMode.HALF_UP);
         }
     }
 
-    /** Soma por hora do dia (só horas com pagamento aparecem). */
+    /** Soma por hora do dia (só horas com movimento aparecem). */
     public Map<Integer, BigDecimal> porHora(Connection c, LocalDateTime ini, LocalDateTime fim) throws SQLException {
         Map<Integer, BigDecimal> m = new LinkedHashMap<>();
-        try (PreparedStatement ps = Sql.preparar(c, "SELECT HOUR(data_hora_pagamento) AS hora, SUM(valor_pago) AS total "
-                + "FROM pagamento WHERE data_hora_pagamento >= ? AND data_hora_pagamento < ? "
-                + "GROUP BY HOUR(data_hora_pagamento) ORDER BY hora", ini, fim);
+        try (PreparedStatement ps = Sql.preparar(c, "SELECT HOUR(m.quando) AS hora, SUM(m.valor) AS total FROM "
+                + MOVIMENTO + "GROUP BY HOUR(m.quando) ORDER BY hora", ini, fim, ini, fim);
              ResultSet rs = ps.executeQuery()) {
             while (rs.next()) {
                 m.put(rs.getInt("hora"), rs.getBigDecimal("total"));
@@ -75,9 +85,8 @@ public class PagamentoDAO {
     /** Soma por dia (só dias com pagamento aparecem). */
     public Map<LocalDate, BigDecimal> porDia(Connection c, LocalDateTime ini, LocalDateTime fim) throws SQLException {
         Map<LocalDate, BigDecimal> m = new LinkedHashMap<>();
-        try (PreparedStatement ps = Sql.preparar(c, "SELECT DATE(data_hora_pagamento) AS dia, SUM(valor_pago) AS total "
-                + "FROM pagamento WHERE data_hora_pagamento >= ? AND data_hora_pagamento < ? "
-                + "GROUP BY DATE(data_hora_pagamento) ORDER BY dia", ini, fim);
+        try (PreparedStatement ps = Sql.preparar(c, "SELECT DATE(m.quando) AS dia, SUM(m.valor) AS total FROM "
+                + MOVIMENTO + "GROUP BY DATE(m.quando) ORDER BY dia", ini, fim, ini, fim);
              ResultSet rs = ps.executeQuery()) {
             while (rs.next()) {
                 m.put(Sql.data(rs, "dia"), rs.getBigDecimal("total"));
@@ -89,10 +98,9 @@ public class PagamentoDAO {
     /** Soma por forma de pagamento (hora grátis aparece com forma nula). */
     public Map<String, BigDecimal> porForma(Connection c, LocalDateTime ini, LocalDateTime fim) throws SQLException {
         Map<String, BigDecimal> m = new LinkedHashMap<>();
-        try (PreparedStatement ps = Sql.preparar(c, "SELECT fp.nome AS forma, SUM(p.valor_pago) AS total "
-                + "FROM pagamento AS p LEFT JOIN forma_pagamento AS fp ON fp.id_forma_pagamento = p.id_forma_pagamento "
-                + "WHERE p.data_hora_pagamento >= ? AND p.data_hora_pagamento < ? "
-                + "GROUP BY fp.nome ORDER BY fp.nome", ini, fim);
+        try (PreparedStatement ps = Sql.preparar(c, "SELECT fp.nome AS forma, SUM(m.valor) AS total FROM " + MOVIMENTO
+                + "LEFT JOIN forma_pagamento AS fp ON fp.id_forma_pagamento = m.id_forma "
+                + "GROUP BY fp.nome ORDER BY fp.nome", ini, fim, ini, fim);
              ResultSet rs = ps.executeQuery()) {
             while (rs.next()) {
                 m.put(rs.getString("forma"), rs.getBigDecimal("total"));

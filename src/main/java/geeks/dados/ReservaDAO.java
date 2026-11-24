@@ -66,6 +66,12 @@ public class ReservaDAO {
                 + "WHERE id_reserva = ? AND status_reserva IN ('PENDENTE_ENTRADA','CONFIRMADA')", idReserva);
     }
 
+    /** Cliente não veio (migration V6). Só reserva ainda ativa e sem sessão. */
+    public int marcarNaoCompareceu(Connection c, int idReserva) throws SQLException {
+        return Sql.atualizar(c, "UPDATE reserva SET status_reserva = 'NAO_COMPARECEU' WHERE id_reserva = ? "
+                + "AND status_reserva IN ('PENDENTE_ENTRADA','CONFIRMADA') AND id_sessao IS NULL", idReserva);
+    }
+
     /** Reservas ativas com início em [inicio, fim). */
     public List<Linha> ativasNoPeriodo(Connection c, LocalDateTime inicio, LocalDateTime fim) throws SQLException {
         return listar(c, "SELECT r.id_reserva, r.id_cliente, r.id_equipamento, r.inicio_previsto, r.fim_previsto "

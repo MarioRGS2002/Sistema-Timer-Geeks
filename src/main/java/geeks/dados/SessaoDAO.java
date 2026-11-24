@@ -102,6 +102,20 @@ public class SessaoDAO {
                 + "AND notificacao_enviada = 0 AND horario_fim IS NULL", idSessao) == 1;
     }
 
+    /** Registra o gerente que corrigiu o horário de saída (coluna da V6). */
+    public void definirFimCorrigidoPor(Connection c, int idSessao, int idFuncionario) throws SQLException {
+        Sql.atualizar(c, "UPDATE sessao SET fim_corrigido_por = ? WHERE id_sessao = ?", idFuncionario, idSessao);
+    }
+
+    /** Muda o horário previsto de uma sessão FECHADA em andamento (acrescentar tempo) e rearma o aviso. */
+    public void definirPrevisto(Connection c, int idSessao, LocalDateTime previsto) throws SQLException {
+        int n = Sql.atualizar(c, "UPDATE sessao SET horario_previsto = ?, notificacao_enviada = 0 "
+                + "WHERE id_sessao = ? AND horario_fim IS NULL AND tipo_tempo = 'FECHADO'", previsto, idSessao);
+        if (n != 1) {
+            throw new IllegalStateException("Só dá para acrescentar tempo a uma sessão de tempo fechado em andamento.");
+        }
+    }
+
     /** Crédito de tempo usado pelo cliente nesta sessão (coluna da V5). */
     public void definirCredito(Connection c, int idSessao, int idCliente, int segundos) throws SQLException {
         Sql.atualizar(c, "UPDATE participante_sessao SET segundos_credito = ? WHERE id_sessao = ? AND id_cliente = ?",
