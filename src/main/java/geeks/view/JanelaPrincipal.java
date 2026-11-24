@@ -49,6 +49,9 @@ public class JanelaPrincipal extends JFrame {
     private final boolean gerente;
     private PainelFaturamento painelFaturamento;
     private PainelFuncionarios painelFuncionarios;
+    private final JLabel lbUsuario = Componentes.rotulo(" ", Font.PLAIN, 14, Tema.BRANCO);
+    private final BotaoGeeks btSair = new BotaoGeeks("Sair", Icone.Tipo.SETA_ESQUERDA, BotaoGeeks.Estilo.CONTORNO);
+    private Timer timerRelogio;
 
     private final PainelSessoes painelSessoes = new PainelSessoes();
     private final PainelReservas painelReservas = new PainelReservas();
@@ -120,8 +123,37 @@ public class JanelaPrincipal extends JFrame {
             adicionarItem(menu, FUNCIONARIOS, "Funcionários", Icone.Tipo.CADEADO);
         }
         menu.add(Box.createVerticalGlue());
+        menu.add(criarUsuarioESair());
+        menu.add(Box.createVerticalStrut(12));
         menu.add(criarRelogio());
         return menu;
+    }
+
+    /** Quem está logado e o botão Sair (troca de atendente para gerente sem fechar o sistema). */
+    private JPanel criarUsuarioESair() {
+        JPanel p = Componentes.transparente(new BorderLayout(0, 8));
+        p.add(lbUsuario, BorderLayout.NORTH);
+        p.add(btSair, BorderLayout.CENTER);
+        p.setAlignmentX(Component.LEFT_ALIGNMENT);
+        p.setMaximumSize(new Dimension(Integer.MAX_VALUE, p.getPreferredSize().height));
+        return p;
+    }
+
+    /** Mostra no menu quem está usando o sistema (ex.: "Maria · Atendente"). */
+    public void setUsuario(String nome, String perfil) {
+        lbUsuario.setText("<html><b>" + nome + "</b><br><span style='color:#B8B8B8'>" + perfil + "</span></html>");
+    }
+
+    public void addListenerSair(ActionListener l) {
+        btSair.addActionListener(l);
+    }
+
+    @Override
+    public void dispose() {
+        if (timerRelogio != null) {
+            timerRelogio.stop();
+        }
+        super.dispose();
     }
 
     /** Relógio no rodapé do menu: o atendente vê a hora sem sair do sistema. */
@@ -135,7 +167,8 @@ public class JanelaPrincipal extends JFrame {
             data.setText(Character.toUpperCase(d.charAt(0)) + d.substring(1));
         };
         atualizar.run();
-        new Timer(1_000, e -> atualizar.run()).start();
+        timerRelogio = new Timer(1_000, e -> atualizar.run());
+        timerRelogio.start();
 
         JPanel caixa = new JPanel(new GridLayout(2, 1, 0, 2)) {
             @Override

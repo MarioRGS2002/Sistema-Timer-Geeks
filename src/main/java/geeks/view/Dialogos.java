@@ -103,8 +103,14 @@ public final class Dialogos {
         exibir(pai, "Atenção", new FormMensagem("Atenção", mensagem, FormMensagem.Tom.ALERTA, Icone.Tipo.ALERTA, "Entendi", false));
     }
 
-    public static void mostrarCliente(Component pai, Cliente c) {
-        exibir(pai, "Dados do usuário", new FormDadosCliente(c));
+    public static void mostrarCliente(Component pai, geeks.model.FichaCliente ficha) {
+        exibir(pai, "Dados do usuário", new FormDadosCliente(ficha));
+    }
+
+    /** Escolher entre vários clientes com nome parecido (busca do Clube). Retorna o escolhido ou null. */
+    public static Cliente escolherCliente(Component pai, String termo, List<Cliente> clientes) {
+        FormEscolherCliente form = new FormEscolherCliente(termo, clientes);
+        return exibir(pai, "Escolher cliente", form) ? form.getSelecionado() : null;
     }
 
     // ---------- Janela modal ----------
@@ -118,18 +124,63 @@ public final class Dialogos {
             dialogo.dispose();
         });
         form.setAoCancelar(dialogo::dispose);
-        dialogo.setContentPane(form);
+        // Rolagem: em telas baixas (ex.: notebook 1366x768) a janela não passa da tela e o conteúdo rola.
+        javax.swing.JScrollPane rolagem = new javax.swing.JScrollPane(new AcompanhaLargura(form),
+                javax.swing.JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED, javax.swing.JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+        rolagem.setBorder(null);
+        rolagem.getViewport().setBackground(Tema.FUNDO);
+        rolagem.getVerticalScrollBar().setUnitIncrement(18);
+        ScrollGeeks.aplicar(rolagem.getVerticalScrollBar());
+        dialogo.setContentPane(rolagem);
         dialogo.getRootPane().registerKeyboardAction(e -> dialogo.dispose(),
                 KeyStroke.getKeyStroke(KeyEvent.VK_ESCAPE, 0), JComponent.WHEN_IN_FOCUSED_WINDOW);
         List<Image> icones = Tema.iconesDaJanela();
         if (!icones.isEmpty()) {
             dialogo.setIconImages(icones);
         }
-        dialogo.setResizable(false);
+        dialogo.setResizable(true);
         dialogo.pack();
+        java.awt.Rectangle tela = java.awt.GraphicsEnvironment.getLocalGraphicsEnvironment().getMaximumWindowBounds();
+        if (dialogo.getHeight() > tela.height - 24) {
+            dialogo.setSize(dialogo.getWidth() + 14, tela.height - 24);
+        }
+        dialogo.setMinimumSize(new java.awt.Dimension(Math.min(dialogo.getWidth(), 420), 260));
         dialogo.setLocationRelativeTo(pai);
         form.animarEntrada();
         dialogo.setVisible(true);
         return confirmado[0];
+    }
+
+    /** Dentro da rolagem, o formulário acompanha a largura da janela e cresce para preencher a altura. */
+    private static final class AcompanhaLargura extends javax.swing.JPanel implements javax.swing.Scrollable {
+        AcompanhaLargura(FormularioGeeks form) {
+            super(new java.awt.BorderLayout());
+            add(form, java.awt.BorderLayout.CENTER);
+        }
+
+        @Override
+        public java.awt.Dimension getPreferredScrollableViewportSize() {
+            return getPreferredSize();
+        }
+
+        @Override
+        public int getScrollableUnitIncrement(java.awt.Rectangle r, int orientacao, int direcao) {
+            return 18;
+        }
+
+        @Override
+        public int getScrollableBlockIncrement(java.awt.Rectangle r, int orientacao, int direcao) {
+            return Math.max(18, r.height - 40);
+        }
+
+        @Override
+        public boolean getScrollableTracksViewportWidth() {
+            return true;
+        }
+
+        @Override
+        public boolean getScrollableTracksViewportHeight() {
+            return getParent() != null && getParent().getHeight() > getPreferredSize().height;
+        }
     }
 }
