@@ -26,6 +26,11 @@ public class PainelCadastro extends PainelPagina {
 
     public PainelCadastro() {
         super("Cadastro de usuários");
+        Mascara.DATA.aplicar(campoNascimento);
+        Mascara.TELEFONE.aplicar(campoTelefone);
+        Mascara.CPF.aplicar(campoCpf);
+        Mascara.CPF.aplicar(campoCpfResponsavel);
+        Mascara.TELEFONE.aplicar(campoTelefoneResponsavel);
         JPanel corpo = Componentes.transparente(new GridLayout(1, 2, 26, 0));
 
         CartaoGeeks form = new CartaoGeeks();
@@ -35,7 +40,7 @@ public class PainelCadastro extends PainelPagina {
         campos.add(comRotulo("Nome", campoNome));
         campos.add(dupla(comRotulo("Data de nascimento", campoNascimento), comRotulo("Telefone", campoTelefone)));
         campos.add(comRotulo("CPF", campoCpf));
-        campos.add(dupla(comRotulo("Responsável (obrigatório para menores de 18)", campoResponsavel),
+        campos.add(dupla(comRotulo("Responsável (se menor de 18)", campoResponsavel),
                 comRotulo("Parentesco", campoParentesco)));
         campos.add(dupla(comRotulo("CPF do responsável", campoCpfResponsavel),
                 comRotulo("Telefone do responsável", campoTelefoneResponsavel)));
