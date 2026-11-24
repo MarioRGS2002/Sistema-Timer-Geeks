@@ -1,6 +1,6 @@
 package geeks.view;
 
-import geeks.dados.CaixaDAO;
+import geeks.model.LancamentoCaixa;
 
 import javax.swing.JPanel;
 import java.awt.BorderLayout;
@@ -13,14 +13,14 @@ public class FormEstorno extends FormularioGeeks {
     private final CampoGeeks valor = new CampoGeeks("0,00");
     private final CampoGeeks motivo = new CampoGeeks("Ex.: cobrado em dobro, forma de pagamento errada...");
 
-    public FormEstorno(CaixaDAO.Pagamento p) {
+    public FormEstorno(LancamentoCaixa.Pagamento p) {
         super("Estornar pagamento", "Estornar", Icone.Tipo.SETA_ESQUERDA);
-        BigDecimal restante = p.valor.subtract(p.estornado);
+        BigDecimal restante = p.valor().subtract(p.estornado());
         valor.setText(restante.toPlainString().replace('.', ','));
         JPanel campos = Componentes.transparente(new GridLayout(0, 1, 0, 12));
-        campos.add(Componentes.rotulo("<html><b>" + (p.cliente == null ? "-" : p.cliente) + "</b>  ·  "
-                + Formatador.moeda(p.valor) + " em " + (p.forma == null ? "-" : p.forma)
-                + (p.estornado.signum() > 0 ? "  ·  já estornado " + Formatador.moeda(p.estornado) : "") + "</html>",
+        campos.add(Componentes.rotulo("<html><b>" + (p.cliente() == null ? "-" : p.cliente()) + "</b>  ·  "
+                + Formatador.moeda(p.valor()) + " em " + (p.forma() == null ? "-" : p.forma())
+                + (p.estornado().signum() > 0 ? "  ·  já estornado " + Formatador.moeda(p.estornado()) : "") + "</html>",
                 Font.PLAIN, 16, Tema.BRANCO));
         campos.add(comRotulo("Valor a estornar (até " + Formatador.moeda(restante) + ")", valor));
         campos.add(comRotulo("Motivo (obrigatório)", motivo));

@@ -1,6 +1,6 @@
 package geeks.view;
 
-import geeks.dados.CaixaDAO;
+import geeks.model.LancamentoCaixa;
 import geeks.model.CaixaModel;
 
 import javax.swing.JComponent;
@@ -75,12 +75,12 @@ public class PainelCaixa extends PainelPagina {
         if (dia.pagamentos.isEmpty()) {
             lista.add(Componentes.rotulo("Nenhum pagamento neste dia.", Font.PLAIN, 16, Tema.CINZA));
         }
-        for (CaixaDAO.Pagamento p : dia.pagamentos) {
+        for (LancamentoCaixa.Pagamento p : dia.pagamentos) {
             lista.add(linhaPagamento(p));
         }
         if (!dia.estornos.isEmpty()) {
             lista.add(Componentes.rotuloIcone("Estornos do dia (" + dia.estornos.size() + ")", Icone.Tipo.ALERTA, Tema.VERMELHO, 17));
-            for (CaixaDAO.Estorno e : dia.estornos) {
+            for (LancamentoCaixa.Estorno e : dia.estornos) {
                 lista.add(linhaEstorno(e));
             }
         }
@@ -99,28 +99,28 @@ public class PainelCaixa extends PainelPagina {
         return c;
     }
 
-    private JComponent linhaPagamento(CaixaDAO.Pagamento p) {
+    private JComponent linhaPagamento(LancamentoCaixa.Pagamento p) {
         CartaoGeeks linha = new CartaoGeeks();
         linha.setLayout(new BorderLayout(16, 0));
         linha.setBorder(new EmptyBorder(10, 16, 10, 16));
-        linha.add(Componentes.rotulo(p.quando.format(HORA), Font.BOLD, 18, Tema.BRANCO), BorderLayout.WEST);
+        linha.add(Componentes.rotulo(p.quando().format(HORA), Font.BOLD, 18, Tema.BRANCO), BorderLayout.WEST);
         JPanel centro = Componentes.transparente(new GridLayout(1, 3, 12, 0));
         JPanel quem = Componentes.transparente(new GridLayout(2, 1, 0, 2));
-        quem.add(Componentes.rotulo(p.cliente == null ? "-" : p.cliente, Font.BOLD, 16, Tema.BRANCO));
-        quem.add(Componentes.rotulo(tipo(p.tipo) + "  ·  recebido por " + p.funcionario, Font.PLAIN, 13, Tema.CINZA));
+        quem.add(Componentes.rotulo(p.cliente() == null ? "-" : p.cliente(), Font.BOLD, 16, Tema.BRANCO));
+        quem.add(Componentes.rotulo(tipo(p.tipo()) + "  ·  recebido por " + p.funcionario(), Font.PLAIN, 13, Tema.CINZA));
         JPanel forma = Componentes.transparente(new FlowLayout(FlowLayout.LEFT, 0, 8));
-        forma.add(new Componentes.Chip(p.forma == null ? "-" : p.forma, Tema.AZUL, Icone.Tipo.MOEDA));
+        forma.add(new Componentes.Chip(p.forma() == null ? "-" : p.forma(), Tema.AZUL, Icone.Tipo.MOEDA));
         JPanel valores = Componentes.transparente(new GridLayout(2, 1, 0, 2));
-        valores.add(Componentes.rotulo(Formatador.moeda(p.valor), Font.BOLD, 17, Tema.AMARELO));
-        valores.add(Componentes.rotulo(p.estornado.signum() > 0 ? "estornado " + Formatador.moeda(p.estornado) : " ",
+        valores.add(Componentes.rotulo(Formatador.moeda(p.valor()), Font.BOLD, 17, Tema.AMARELO));
+        valores.add(Componentes.rotulo(p.estornado().signum() > 0 ? "estornado " + Formatador.moeda(p.estornado()) : " ",
                 Font.PLAIN, 13, Tema.VERMELHO));
         centro.add(quem);
         centro.add(forma);
         centro.add(valores);
         linha.add(centro, BorderLayout.CENTER);
         BotaoGeeks estornar = new BotaoGeeks("Estornar", Icone.Tipo.SETA_ESQUERDA, BotaoGeeks.Estilo.LINK);
-        estornar.setActionCommand(String.valueOf(p.idPagamento));
-        estornar.setEnabled(p.estornado.compareTo(p.valor) < 0);
+        estornar.setActionCommand(String.valueOf(p.idPagamento()));
+        estornar.setEnabled(p.estornado().compareTo(p.valor()) < 0);
         if (listenerEstornar != null) {
             estornar.addActionListener(listenerEstornar);
         }
@@ -129,15 +129,15 @@ public class PainelCaixa extends PainelPagina {
         return linha;
     }
 
-    private JComponent linhaEstorno(CaixaDAO.Estorno e) {
+    private JComponent linhaEstorno(LancamentoCaixa.Estorno e) {
         CartaoGeeks linha = new CartaoGeeks();
         linha.setLayout(new BorderLayout(16, 0));
         linha.setBorder(new EmptyBorder(10, 16, 10, 16));
-        linha.add(Componentes.rotulo(e.quando.format(HORA), Font.BOLD, 18, Tema.VERMELHO), BorderLayout.WEST);
-        linha.add(Componentes.rotulo("<html>" + e.motivo.replace("<", "&lt;") + "<br><span style='color:#B8B8B8'>por "
-                + e.funcionario + (e.forma == null ? "" : "  ·  " + e.forma) + "</span></html>", Font.PLAIN, 15, Tema.BRANCO),
+        linha.add(Componentes.rotulo(e.quando().format(HORA), Font.BOLD, 18, Tema.VERMELHO), BorderLayout.WEST);
+        linha.add(Componentes.rotulo("<html>" + e.motivo().replace("<", "&lt;") + "<br><span style='color:#B8B8B8'>por "
+                + e.funcionario() + (e.forma() == null ? "" : "  ·  " + e.forma()) + "</span></html>", Font.PLAIN, 15, Tema.BRANCO),
                 BorderLayout.CENTER);
-        linha.add(Componentes.rotulo("- " + Formatador.moeda(e.valor), Font.BOLD, 17, Tema.VERMELHO), BorderLayout.EAST);
+        linha.add(Componentes.rotulo("- " + Formatador.moeda(e.valor()), Font.BOLD, 17, Tema.VERMELHO), BorderLayout.EAST);
         return linha;
     }
 

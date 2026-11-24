@@ -25,11 +25,11 @@ public class CaixaModel {
         public final LocalDate dia;
         public final BigDecimal total;
         public final Map<String, BigDecimal> porForma;
-        public final List<CaixaDAO.Pagamento> pagamentos;
-        public final List<CaixaDAO.Estorno> estornos;
+        public final List<LancamentoCaixa.Pagamento> pagamentos;
+        public final List<LancamentoCaixa.Estorno> estornos;
 
-        Dia(LocalDate dia, BigDecimal total, Map<String, BigDecimal> porForma, List<CaixaDAO.Pagamento> pagamentos,
-            List<CaixaDAO.Estorno> estornos) {
+        Dia(LocalDate dia, BigDecimal total, Map<String, BigDecimal> porForma, List<LancamentoCaixa.Pagamento> pagamentos,
+            List<LancamentoCaixa.Estorno> estornos) {
             this.dia = dia;
             this.total = total;
             this.porForma = porForma;
@@ -38,7 +38,7 @@ public class CaixaModel {
         }
 
         public BigDecimal totalEstornos() {
-            return estornos.stream().map(e -> e.valor).reduce(BigDecimal.ZERO.setScale(2), BigDecimal::add);
+            return estornos.stream().map(LancamentoCaixa.Estorno::valor).reduce(BigDecimal.ZERO.setScale(2), BigDecimal::add);
         }
     }
 
@@ -49,8 +49,13 @@ public class CaixaModel {
         return Transacao.consultar(c -> {
             Map<String, BigDecimal> formas = pagamentoDAO.porForma(c, ini, fim);
             formas.remove(null); // hora grátis (valor 0) não é dinheiro no caixa
-            return new Dia(dia, pagamentoDAO.total(c, ini, fim), formas, caixaDAO.pagamentos(c, ini, fim),
-                    caixaDAO.estornos(c, ini, fim));
+            List<LancamentoCaixa.Pagamento> pags = caixaDAO.pagamentos(c, ini, fim).stream()
+                    .map(p -> new LancamentoCaixa.Pagamento(p.idPagamento, p.quando, p.valor, p.tipo, p.forma,
+                            p.funcionario, p.cliente, p.estornado)).toList();
+            List<LancamentoCaixa.Estorno> ests = caixaDAO.estornos(c, ini, fim).stream()
+                    .map(e -> new LancamentoCaixa.Estorno(e.idEstorno, e.idPagamento, e.quando, e.valor, e.motivo,
+                            e.funcionario, e.forma)).toList();
+            return new Dia(dia, pagamentoDAO.total(c, ini, fim), formas, pags, ests);
         });
     }
 
