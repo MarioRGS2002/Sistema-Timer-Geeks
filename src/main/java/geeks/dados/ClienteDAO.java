@@ -39,6 +39,49 @@ public class ClienteDAO {
                 hoje, "%" + escaparLike(termo) + "%").stream().findFirst();
     }
 
+    /** Todos os clientes ativos cujo nome contém o termo (até 30), para escolher entre homônimos. */
+    public List<Cliente> listarPorParteDoNome(Connection c, String termo, LocalDate hoje) throws SQLException {
+        return listar(c, BASE + "WHERE c.ativo = 1 AND c.nome LIKE ? ORDER BY c.nome LIMIT 30",
+                hoje, "%" + escaparLike(termo) + "%");
+    }
+
+    /**
+     * Dados extras da ficha do cliente: responsável (nome, parentesco, CPF, telefone), até quando vai
+     * o Clube, data do cadastro, quantas sessões já fez e a última visita.
+     */
+    public java.util.Map<String, Object> ficha(Connection c, int idCliente) throws SQLException {
+        java.util.Map<String, Object> m = new java.util.HashMap<>();
+        try (PreparedStatement ps = Sql.preparar(c, "SELECT r.nome, r.parentesco, r.cpf, r.telefone FROM responsavel AS r "
+                + "WHERE r.id_cliente = ? ORDER BY r.id_responsavel LIMIT 1", idCliente); ResultSet rs = ps.executeQuery()) {
+            if (rs.next()) {
+                m.put("respNome", rs.getString(1));
+                m.put("respParentesco", rs.getString(2));
+                m.put("respCpf", rs.getString(3));
+                m.put("respTelefone", rs.getString(4));
+            }
+        }
+        try (PreparedStatement ps = Sql.preparar(c, "SELECT MAX(a.data_fim) FROM assinatura_clube AS a "
+                + "WHERE a.id_cliente = ? AND a.situacao = 'ATIVA'", idCliente); ResultSet rs = ps.executeQuery()) {
+            if (rs.next() && rs.getDate(1) != null) {
+                m.put("clubeAte", rs.getDate(1).toLocalDate());
+            }
+        }
+        try (PreparedStatement ps = Sql.preparar(c, "SELECT c.data_cadastro, COUNT(s.id_sessao), MAX(s.horario_fim) "
+                + "FROM cliente AS c LEFT JOIN participante_sessao AS ps ON ps.id_cliente = c.id_cliente "
+                + "LEFT JOIN sessao AS s ON s.id_sessao = ps.id_sessao AND s.horario_fim IS NOT NULL "
+                + "WHERE c.id_cliente = ? GROUP BY c.data_cadastro", idCliente); ResultSet rs = ps.executeQuery()) {
+            if (rs.next()) {
+                m.put("cadastro", Sql.dataHora(rs, "data_cadastro"));
+                m.put("sessoes", rs.getLong(2));
+                java.sql.Timestamp ult = rs.getTimestamp(3);
+                if (ult != null) {
+                    m.put("ultimaVisita", ult.toLocalDateTime());
+                }
+            }
+        }
+        return m;
+    }
+
     public boolean existeCpf(Connection c, String cpf) throws SQLException {
         return Sql.contar(c, "SELECT COUNT(*) FROM cliente WHERE cpf = ?", cpf) > 0;
     }

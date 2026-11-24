@@ -100,7 +100,7 @@ public class PainelHistorico extends PainelPagina {
         linha.add(centro, BorderLayout.CENTER);
 
         BotaoGeeks dados = new BotaoGeeks("Dados do usuário", Icone.Tipo.USUARIO_MAIS, BotaoGeeks.Estilo.LINK);
-        dados.setActionCommand(s.getCliente().getCpf());
+        dados.setActionCommand(String.valueOf(s.getCliente().getIdCliente()));
         if (listenerDados != null) {
             dados.addActionListener(listenerDados);
         }
@@ -130,7 +130,7 @@ public class PainelHistorico extends PainelPagina {
         campoBusca.getDocument().addDocumentListener(l);
     }
 
-    /** O actionCommand do evento é o CPF do cliente da linha. */
+    /** O actionCommand do evento é o id do cliente da linha. */
     public void addListenerDadosUsuario(ActionListener l) {
         this.listenerDados = l;
     }
