@@ -16,6 +16,7 @@ public class Sessao {
     private final BigDecimal valorHora;
     private final int gratisDisponivel;
     private final BigDecimal valorTotal;
+    private final BigDecimal entradaPaga;
 
     /**
      * @param gratisDisponivel segundos de hora grátis do Clube ainda disponíveis no dia (sessão ativa)
@@ -33,6 +34,37 @@ public class Sessao {
         this.valorHora = valorHora;
         this.gratisDisponivel = gratisDisponivel;
         this.valorTotal = valorTotal;
+        this.entradaPaga = BigDecimal.ZERO;
+    }
+
+    /** @param entradaPaga entrada já paga na reserva que virou esta sessão (descontada do "a pagar") */
+    public Sessao(int idSessao, Cliente cliente, Dispositivo dispositivo, LocalDateTime inicio, LocalDateTime previsto,
+                  LocalDateTime fim, TipoTempo tipoTempo, BigDecimal valorHora, int gratisDisponivel, BigDecimal valorTotal,
+                  BigDecimal entradaPaga) {
+        this.idSessao = idSessao;
+        this.cliente = cliente;
+        this.dispositivo = dispositivo;
+        this.inicio = inicio;
+        this.previsto = previsto;
+        this.fim = fim;
+        this.tipoTempo = tipoTempo;
+        this.valorHora = valorHora;
+        this.gratisDisponivel = gratisDisponivel;
+        this.valorTotal = valorTotal;
+        this.entradaPaga = entradaPaga == null ? BigDecimal.ZERO : entradaPaga;
+    }
+
+    /**
+     * Quanto falta pagar AGORA na sessão ativa: o valor até agora menos a entrada da reserva
+     * (é o que o cartão da sessão mostra e o que aparece ao encerrar sem usar crédito).
+     */
+    public BigDecimal getAPagar() {
+        BigDecimal resto = getValor().subtract(isAtiva() ? entradaPaga : BigDecimal.ZERO);
+        return resto.signum() > 0 ? resto : BigDecimal.ZERO.setScale(2);
+    }
+
+    public BigDecimal getEntradaPaga() {
+        return entradaPaga;
     }
 
     public boolean isAtiva() {

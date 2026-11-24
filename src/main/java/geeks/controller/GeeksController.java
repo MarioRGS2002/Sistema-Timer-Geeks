@@ -10,6 +10,9 @@ import geeks.view.FormFuncionario;
 import geeks.view.FormEncerrarSessao;
 import geeks.model.PreviaEncerramento;
 import geeks.model.AvisoReserva;
+import geeks.model.Contexto;
+import geeks.model.Regras;
+import javax.swing.SwingUtilities;
 import geeks.model.GeeksModel;
 import geeks.model.PeriodoFaturamento;
 import geeks.model.SerieFaturamento;
@@ -43,6 +46,10 @@ public class GeeksController {
     private final FaturamentoModel faturamento = new FaturamentoModel();
     private final FuncionariosModel funcionarios = new FuncionariosModel();
     private final int idLogado;
+    private Timer timer;
+    /** Reservas já avisadas nesta execução (o aviso de sessão acabando fica marcado no banco). */
+    private final java.util.Set<Integer> reservasAvisadas = new java.util.HashSet<>();
+    private boolean mostrandoAviso;
     private PeriodoFaturamento periodoFaturamento = PeriodoFaturamento.SEMANA;
     private LocalDate referenciaFaturamento = LocalDate.now();
 
@@ -62,11 +69,20 @@ public class GeeksController {
             ligarFaturamento();
             ligarFuncionarios();
         }
+        if (usuario != null) {
+            view.setUsuario(usuario.getNome(), usuario.getPerfil().getRotulo());
+        }
+        view.addListenerSair(e -> sair());
 
-        // Atualiza tempo e valor das sessões ativas a cada 30 segundos
-        new Timer(30_000, e -> atualizarSessoes()).start();
+        // A cada 30 segundos: tempo e valor das sessões ativas e os avisos (tempo acabando, reserva chegando)
+        timer = new Timer(30_000, e -> {
+            atualizarSessoes();
+            verificarAvisos();
+        });
+        timer.start();
 
         atualizarTudo();
+        SwingUtilities.invokeLater(this::verificarAvisos);
         view.mostrarTela(JanelaPrincipal.SESSOES);
         view.setVisible(true);
     }
@@ -114,9 +130,11 @@ public class GeeksController {
         view.getPainelHistorico().addListenerFiltro(e -> atualizarHistorico());
         view.getPainelHistorico().addListenerBusca(new AoDigitar(this::atualizarHistorico));
         view.getPainelHistorico().addListenerDadosUsuario(e -> {
-            Cliente c = model.buscarCliente(e.getActionCommand());
-            if (c != null) {
-                Dialogos.mostrarCliente(view, c);
+            geeks.model.FichaCliente ficha = model.getFicha(Integer.parseInt(e.getActionCommand()));
+            if (ficha == null) {
+                Dialogos.info(view, "Não encontrei o cadastro desse cliente.");
+            } else {
+                Dialogos.mostrarCliente(view, ficha);
             }
         });
     }
@@ -171,6 +189,52 @@ public class GeeksController {
         boolean podeAvancar = !periodoFaturamento.inicio(periodoFaturamento.deslocar(referenciaFaturamento, 1)).isAfter(hoje);
         boolean periodoAtual = periodoFaturamento.inicio(referenciaFaturamento).equals(periodoFaturamento.inicio(hoje));
         view.getPainelFaturamento().atualizar(serie, podeAvancar, periodoAtual);
+    }
+
+    // ---------- Sair e avisos ----------
+
+    /** Volta para a tela de login (ex.: o atendente sai e o gerente entra no mesmo computador). */
+    private void sair() {
+        if (!Dialogos.confirmar(view, "Sair", "Sair do sistema e voltar para a tela de login? As sessões ativas continuam "
+                + "contando normalmente.", "Sair", false)) {
+            return;
+        }
+        timer.stop();
+        Contexto.sair();
+        view.dispose();
+        new LoginController();
+    }
+
+    /**
+     * Avisos: sessão de tempo fechado acabando (ou acabada) e reserva começando em poucos minutos.
+     * Um aviso por sessão (marcado no banco, vale para todos os computadores) e por reserva.
+     */
+    private void verificarAvisos() {
+        if (mostrandoAviso || !view.isDisplayable()) {
+            return;
+        }
+        List<String> avisos = new java.util.ArrayList<>();
+        for (Sessao s : model.sessoesParaAvisar(Regras.ALERTA_RESERVA_MINUTOS)) {
+            long falta = java.time.Duration.between(LocalDateTime.now(), s.getPrevisto()).toMinutes();
+            avisos.add(s.getCliente().getNome() + " em " + s.getDispositivo().getNome()
+                    + (falta > 0 ? ": o tempo acaba em " + falta + " min (" + s.getPrevisto().toLocalTime().withNano(0) + ")."
+                    : ": o tempo combinado acabou às " + s.getPrevisto().toLocalTime().withNano(0) + "."));
+        }
+        for (Reserva r : model.reservasChegando(Regras.ALERTA_RESERVA_MINUTOS)) {
+            if (reservasAvisadas.add(r.getIdReserva())) {
+                avisos.add("Reserva de " + r.getCliente().getNome() + " em " + r.getDispositivo().getNome()
+                        + " às " + r.getDataHora().toLocalTime() + ".");
+            }
+        }
+        if (avisos.isEmpty()) {
+            return;
+        }
+        mostrandoAviso = true;
+        try {
+            Dialogos.info(view, String.join("\n", avisos));
+        } finally {
+            mostrandoAviso = false;
+        }
     }
 
     // ---------- Funcionários (somente gerente) ----------
@@ -305,10 +369,11 @@ public class GeeksController {
         }
         String forma = form.getFormaPagamento();
         boolean usarCredito = form.isUsarCredito();
+        LocalDateTime fimMostrado = form.getFimMostrado();
         // o cartão some com animação e só então a sessão é encerrada e as telas atualizadas
         view.getPainelSessoes().animarSaida(id, () -> {
             try {
-                PreviaEncerramento r = model.encerrarSessao(id, forma, usarCredito);
+                PreviaEncerramento r = model.encerrarSessao(id, forma, usarCredito, fimMostrado);
                 if (r.getCobranca().getMinutosCredito() > 0) {
                     Dialogos.sucesso(view, sessao.getCliente().getNome() + " ficou com " + r.getCobranca().getMinutosCredito()
                             + " min de crédito em " + sessao.getDispositivo().getTipo().getRotulo()
@@ -415,10 +480,12 @@ public class GeeksController {
         if (termo.isBlank()) {
             return;
         }
-        clienteDoClube = model.buscarCliente(termo);
-        if (clienteDoClube == null) {
+        List<Cliente> achados = model.buscarClientes(termo);
+        clienteDoClube = achados.size() == 1 ? achados.get(0)
+                : achados.size() > 1 ? Dialogos.escolherCliente(view, termo.trim(), achados) : null;
+        if (achados.isEmpty()) {
             view.getPainelClube().mostrarNaoEncontrado(termo.trim());
-        } else {
+        } else if (clienteDoClube != null) {
             view.getPainelClube().mostrarCliente(clienteDoClube);
         }
     }

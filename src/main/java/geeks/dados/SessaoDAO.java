@@ -26,11 +26,15 @@ public class SessaoDAO {
         public BigDecimal valorHora;
         public BigDecimal valorTotal;
         public int segundosGratis;
+        /** Entrada paga na reserva que virou esta sessão (0 se não veio de reserva). */
+        public BigDecimal entradaPaga;
     }
 
     private static final String BASE = "SELECT s.id_sessao, s.horario_inicio, s.horario_previsto, s.horario_fim, "
             + "s.tipo_tempo, s.valor_hora_contratado, s.valor_total_devido, s.id_equipamento, e.id_tipo, "
-            + "ps.id_cliente, ps.segundos_gratis "
+            + "ps.id_cliente, ps.segundos_gratis, "
+            + "(SELECT COALESCE(SUM(p.valor_pago), 0) FROM reserva AS r "
+            + "  INNER JOIN pagamento AS p ON p.id_reserva = r.id_reserva WHERE r.id_sessao = s.id_sessao) AS entrada_paga "
             + "FROM sessao AS s "
             + "INNER JOIN equipamento AS e ON e.id_equipamento = s.id_equipamento "
             + "INNER JOIN tipo_equipamento AS t ON t.id_tipo = e.id_tipo "
@@ -89,6 +93,15 @@ public class SessaoDAO {
         }
     }
 
+    /**
+     * Marca que o aviso de "tempo acabando" foi dado. Devolve true só para quem marcou primeiro
+     * (com dois computadores abertos, só um deles mostra o aviso).
+     */
+    public boolean marcarAvisoTempo(Connection c, int idSessao) throws SQLException {
+        return Sql.atualizar(c, "UPDATE sessao SET notificacao_enviada = 1 WHERE id_sessao = ? "
+                + "AND notificacao_enviada = 0 AND horario_fim IS NULL", idSessao) == 1;
+    }
+
     /** Crédito de tempo usado pelo cliente nesta sessão (coluna da V5). */
     public void definirCredito(Connection c, int idSessao, int idCliente, int segundos) throws SQLException {
         Sql.atualizar(c, "UPDATE participante_sessao SET segundos_credito = ? WHERE id_sessao = ? AND id_cliente = ?",
@@ -132,6 +145,7 @@ public class SessaoDAO {
                 l.valorHora = rs.getBigDecimal("valor_hora_contratado");
                 l.valorTotal = rs.getBigDecimal("valor_total_devido");
                 l.segundosGratis = rs.getInt("segundos_gratis");
+                l.entradaPaga = rs.getBigDecimal("entrada_paga");
                 lista.add(l);
             }
         }

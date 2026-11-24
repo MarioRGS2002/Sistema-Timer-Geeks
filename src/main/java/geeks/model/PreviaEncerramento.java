@@ -8,13 +8,20 @@ public class PreviaEncerramento {
     private final int saldoCreditoMinutos;
     private final BigDecimal entradaPaga;
     private final BigDecimal aPagar;
+    private final java.time.LocalDateTime fim;
 
-    public PreviaEncerramento(Cobranca cobranca, int saldoCreditoMinutos, BigDecimal entradaPaga) {
+    public PreviaEncerramento(Cobranca cobranca, int saldoCreditoMinutos, BigDecimal entradaPaga, java.time.LocalDateTime fim) {
+        this.fim = fim;
         this.cobranca = cobranca;
         this.saldoCreditoMinutos = saldoCreditoMinutos;
         this.entradaPaga = entradaPaga;
         BigDecimal resto = cobranca.getValor().subtract(entradaPaga);
         this.aPagar = resto.signum() > 0 ? resto : BigDecimal.ZERO.setScale(2);
+    }
+
+    /** Horário de fim usado no cálculo (o encerramento grava exatamente este, para valer o valor mostrado). */
+    public java.time.LocalDateTime getFim() {
+        return fim;
     }
 
     public Cobranca getCobranca() {

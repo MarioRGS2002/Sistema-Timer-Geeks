@@ -79,8 +79,10 @@ public class FuncionariosModel {
             throw new IllegalArgumentException("Você não pode desativar o seu próprio acesso.");
         }
         Transacao.executar(c -> {
+            // Trava TODOS os gerentes ativos antes de qualquer outra linha: dois gerentes desativando um ao
+            // outro ao mesmo tempo esperam na mesma ordem (sem deadlock) e nunca sobra zero gerente.
+            int gerentes = dao.gerentesAtivosTravando(c);
             exigirGerenteAtivo(c);
-            int gerentes = dao.gerentesAtivosTravando(c); // trava antes, para duas desativações não passarem juntas
             FuncionarioDAO.Linha f = dao.travar(c, idFuncionario)
                     .orElseThrow(() -> new IllegalArgumentException("Funcionário não encontrado."));
             if (!f.ativo) {

@@ -80,8 +80,9 @@ public class GeeksModel {
             throw new IllegalArgumentException("CPF inválido.");
         }
         String tel = telefone == null ? "" : telefone.trim();
-        if (tel.length() > 20) {
-            throw new IllegalArgumentException("Telefone inválido.");
+        int digitosTel = tel.replaceAll("\\D", "").length();
+        if (tel.length() > 20 || (digitosTel > 0 && digitosTel < 10)) {
+            throw new IllegalArgumentException("Telefone inválido: informe o DDD e o número (10 ou 11 dígitos).");
         }
         boolean menor = nascimento.plusYears(18).isAfter(hoje);
         String rNome = respNome == null ? "" : respNome.trim();
@@ -102,8 +103,16 @@ public class GeeksModel {
             if (rCpf.equals(cpfNumeros)) {
                 throw new IllegalArgumentException("O CPF do responsável não pode ser o mesmo do cliente.");
             }
-            if (rTel.length() > 20 || rPar.length() > 50) {
-                throw new IllegalArgumentException("Telefone ou parentesco do responsável grande demais.");
+            String telDig = tel.replaceAll("\\D", "");
+            if (!telDig.isEmpty() && telDig.equals(rTel.replaceAll("\\D", ""))) {
+                throw new IllegalArgumentException("O telefone do responsável não pode ser o mesmo do cliente.");
+            }
+            int digitosRTel = rTel.replaceAll("\\D", "").length();
+            if (rTel.length() > 20 || (digitosRTel > 0 && digitosRTel < 10)) {
+                throw new IllegalArgumentException("Telefone do responsável inválido: informe o DDD e o número.");
+            }
+            if (rPar.length() > 50) {
+                throw new IllegalArgumentException("Parentesco grande demais (até 50 caracteres).");
             }
         }
         return Transacao.executar(c -> {
@@ -142,6 +151,38 @@ public class GeeksModel {
     /** Formas de pagamento cadastradas no banco (Dinheiro, PIX, Débito, Crédito...). */
     public List<String> getFormasPagamento() {
         return Transacao.consultar(pagamentoDAO::formas);
+    }
+
+    /** Ficha completa do cliente (janela "Dados do usuário"); null se não existir. */
+    public FichaCliente getFicha(int idCliente) {
+        LocalDate hoje = LocalDate.now();
+        return Transacao.consultar(c -> {
+            Optional<Cliente> cl = clienteDAO.porId(c, idCliente, hoje);
+            if (cl.isEmpty()) {
+                return null;
+            }
+            Map<String, Object> f = clienteDAO.ficha(c, idCliente);
+            LocalDate clubeAte = (LocalDate) f.get("clubeAte");
+            if (clubeAte != null && clubeAte.isBefore(hoje)) {
+                clubeAte = null; // vencida: não está em dia
+            }
+            return new FichaCliente(cl.get(), (String) f.get("respNome"), (String) f.get("respParentesco"),
+                    (String) f.get("respCpf"), (String) f.get("respTelefone"), clubeAte,
+                    creditoDAO.saldo(c, idCliente, hoje), (LocalDateTime) f.get("cadastro"),
+                    f.get("sessoes") == null ? 0 : (Long) f.get("sessoes"), (LocalDateTime) f.get("ultimaVisita"));
+        });
+    }
+
+    /** Busca para o Clube: por CPF (11 números) um cliente; por nome, todos os parecidos (para escolher). */
+    public List<Cliente> buscarClientes(String termo) {
+        if (termo == null || termo.isBlank()) {
+            return List.of();
+        }
+        String numeros = termo.replaceAll("\\D", "");
+        LocalDate hoje = LocalDate.now();
+        return Transacao.consultar(c -> numeros.length() == 11
+                ? clienteDAO.porCpf(c, numeros, hoje).map(List::of).orElse(List.of())
+                : clienteDAO.listarPorParteDoNome(c, termo.trim(), hoje));
     }
 
     /** Busca por CPF (somente números) ou por parte do nome. */
@@ -309,9 +350,18 @@ public class GeeksModel {
      * tempo pago e não usado. Em qualquer falha, nada fica gravado (rollback).
      */
     public PreviaEncerramento encerrarSessao(String id, String formaPagamento, boolean usarCredito) {
+        return encerrarSessao(id, formaPagamento, usarCredito, null);
+    }
+
+    /**
+     * @param fimMostrado o horário de fim da prévia que o atendente viu e cobrou (null = agora). Usar o
+     *                    mesmo horário garante que o valor gravado é o valor mostrado na janela.
+     */
+    public PreviaEncerramento encerrarSessao(String id, String formaPagamento, boolean usarCredito, LocalDateTime fimMostrado) {
         int idSessao = idNumerico(id, "S");
         int idFuncionario = Contexto.idFuncionario();
-        LocalDateTime fim = LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS);
+        LocalDateTime agora = LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS);
+        LocalDateTime fim = fimMostrado == null || fimMostrado.isAfter(agora) ? agora : fimMostrado;
         return Transacao.executar(c -> encerrar(c, idSessao, fim, idFuncionario, formaPagamento, usarCredito));
     }
 
@@ -357,7 +407,7 @@ public class GeeksModel {
         Cobranca cob = Cobranca.calcular(TipoTempo.valueOf(s.tipoTempo), s.inicio, s.previsto, fim, s.valorHora,
                 gratisDisponivel, usarCredito ? saldo * 60 : 0);
         BigDecimal entrada = reservaDAO.entradaPagaDaSessao(c, s.idSessao);
-        return new PreviaEncerramento(cob, saldo, entrada);
+        return new PreviaEncerramento(cob, saldo, entrada, fim);
     }
 
     public boolean dispositivoOcupado(Dispositivo dispositivo) {
@@ -382,6 +432,47 @@ public class GeeksModel {
                     gratis = Math.max(0, Cobranca.SEGUNDOS_HORA - sessaoDAO.gratisUsadoNoDia(c, l.idCliente, l.inicio.toLocalDate()));
                 }
                 lista.add(montar(l, cl, gratis));
+            }
+            return lista;
+        });
+    }
+
+    /**
+     * Sessões de tempo fechado que acabam em até {@code minutos} (ou já acabaram) e ainda não foram
+     * avisadas. Ao devolver, marca como avisadas (o aviso aparece uma vez, em um computador).
+     */
+    public List<Sessao> sessoesParaAvisar(int minutos) {
+        LocalDateTime limite = LocalDateTime.now().plusMinutes(minutos);
+        List<Sessao> candidatas = getSessoesAtivas().stream()
+                .filter(s -> s.getPrevisto() != null && !s.getPrevisto().isAfter(limite))
+                .collect(Collectors.toList());
+        if (candidatas.isEmpty()) {
+            return candidatas;
+        }
+        return Transacao.executar(c -> {
+            List<Sessao> avisar = new ArrayList<>();
+            for (Sessao s : candidatas) {
+                if (sessaoDAO.marcarAvisoTempo(c, s.getIdSessao())) {
+                    avisar.add(s);
+                }
+            }
+            return avisar;
+        });
+    }
+
+    /** Reservas ativas (o cliente ainda não chegou) que começam nos próximos {@code minutos}. */
+    public List<Reserva> reservasChegando(int minutos) {
+        LocalDateTime agora = LocalDateTime.now();
+        LocalDate hoje = agora.toLocalDate();
+        return Transacao.consultar(c -> {
+            Map<Integer, Cliente> clientes = clientesPorId(c, hoje);
+            List<Reserva> lista = new ArrayList<>();
+            for (ReservaDAO.Linha l : reservaDAO.ativasNoPeriodo(c, agora, agora.plusMinutes(minutos))) {
+                Dispositivo d = dispositivoPorId.get(l.idEquipamento);
+                Cliente cl = clientes.get(l.idCliente);
+                if (d != null && cl != null) {
+                    lista.add(new Reserva(l.idReserva, cl, d, l.inicio, l.fim));
+                }
             }
             return lista;
         });
@@ -561,7 +652,7 @@ public class GeeksModel {
             d = new Dispositivo(l.idEquipamento, "Equipamento #" + l.idEquipamento, TipoDispositivo.PC);
         }
         return new Sessao(l.idSessao, cliente, d, l.inicio, l.previsto, l.fim, TipoTempo.valueOf(l.tipoTempo),
-                l.valorHora, gratisDisponivel, l.valorTotal);
+                l.valorHora, gratisDisponivel, l.valorTotal, l.entradaPaga);
     }
 
     private static int idNumerico(String id, String prefixo) {

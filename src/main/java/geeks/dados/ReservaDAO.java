@@ -81,12 +81,15 @@ public class ReservaDAO {
         return dias;
     }
 
-    /** Próxima reserva ativa (ainda sem sessão) do equipamento a partir de agora. */
+    /**
+     * Próxima reserva ativa (ainda sem sessão) do equipamento que ainda não terminou: inclui a que
+     * já começou e cujo cliente ainda não chegou (senão outra pessoa ocuparia o horário reservado).
+     */
     public Optional<Linha> proximaAtiva(Connection c, int idEquipamento, LocalDateTime agora) throws SQLException {
         return listar(c, "SELECT r.id_reserva, r.id_cliente, r.id_equipamento, r.inicio_previsto, r.fim_previsto "
                 + "FROM reserva AS r WHERE r.id_equipamento = ? "
                 + "AND r.status_reserva IN ('PENDENTE_ENTRADA','CONFIRMADA') "
-                + "AND r.id_sessao IS NULL AND r.inicio_previsto >= ? "
+                + "AND r.id_sessao IS NULL AND r.fim_previsto > ? "
                 + "ORDER BY r.inicio_previsto LIMIT 1", idEquipamento, agora).stream().findFirst();
     }
 

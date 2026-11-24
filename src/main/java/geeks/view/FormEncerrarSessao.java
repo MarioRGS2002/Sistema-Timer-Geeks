@@ -136,6 +136,11 @@ public class FormEncerrarSessao extends FormularioGeeks {
         return chkCredito.isSelected();
     }
 
+    /** Horário de fim do cálculo mostrado (o encerramento grava este mesmo horário). */
+    public java.time.LocalDateTime getFimMostrado() {
+        return atual.getFim();
+    }
+
     @Override
     public void animarEntrada() {
         super.animarEntrada();

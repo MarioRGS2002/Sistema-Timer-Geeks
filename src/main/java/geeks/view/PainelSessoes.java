@@ -133,26 +133,52 @@ public class PainelSessoes extends PainelPagina {
         nomes.add(linhaChip);
         topo.add(nomes, BorderLayout.CENTER);
 
-        // A barra muda de cor conforme a sessão fica longa (2h laranja, 3h vermelho)
         long minutos = s.getDuracao().toMinutes();
         int atrasoBarra = atrasoAnimacao < 0 ? -1 : atrasoAnimacao + 150;
         Componentes.Barra barra;
-        if (minutos >= 180) {
-            barra = new Componentes.Barra(1, atrasoBarra, Tema.VERMELHO, new Color(0xFF2D55));
-        } else if (minutos >= 120) {
-            barra = new Componentes.Barra(minutos / REFERENCIA_BARRA_MIN, atrasoBarra, new Color(0xFFB800), new Color(0xFF8A00));
+        String linhaTempo;
+        Color corLinha;
+        if (s.getPrevisto() != null) {
+            // Tempo fechado: a barra enche até o horário combinado; laranja nos últimos 10 min, vermelha ao esgotar
+            long contratado = Math.max(1, java.time.Duration.between(s.getInicio(), s.getPrevisto()).toMinutes());
+            long falta = java.time.Duration.between(java.time.LocalDateTime.now(), s.getPrevisto()).toMinutes();
+            double fracao = Math.min(1.0, (double) minutos / contratado);
+            if (falta < 0) {
+                barra = new Componentes.Barra(1, atrasoBarra, Tema.VERMELHO, new Color(0xFF2D55));
+                linhaTempo = "Tempo esgotado às " + s.getPrevisto().format(HORA) + "  ·  há " + (-falta) + " min";
+                corLinha = Tema.VERMELHO;
+            } else if (falta <= 10) {
+                barra = new Componentes.Barra(fracao, atrasoBarra, new Color(0xFFB800), new Color(0xFF8A00));
+                linhaTempo = "Até " + s.getPrevisto().format(HORA) + "  ·  faltam " + falta + " min";
+                corLinha = new Color(0xFFB800);
+            } else {
+                barra = new Componentes.Barra(fracao, atrasoBarra);
+                linhaTempo = "Até " + s.getPrevisto().format(HORA) + "  ·  faltam " + Formatador.duracao(java.time.Duration.ofMinutes(falta));
+                corLinha = new Color(0x8A8A8A);
+            }
         } else {
-            barra = new Componentes.Barra(minutos / REFERENCIA_BARRA_MIN, atrasoBarra);
+            // Tempo livre: a barra muda de cor conforme a sessão fica longa (2h laranja, 3h vermelho)
+            if (minutos >= 180) {
+                barra = new Componentes.Barra(1, atrasoBarra, Tema.VERMELHO, new Color(0xFF2D55));
+            } else if (minutos >= 120) {
+                barra = new Componentes.Barra(minutos / REFERENCIA_BARRA_MIN, atrasoBarra, new Color(0xFFB800), new Color(0xFF8A00));
+            } else {
+                barra = new Componentes.Barra(minutos / REFERENCIA_BARRA_MIN, atrasoBarra);
+            }
+            linhaTempo = "Tempo livre desde " + s.getInicio().format(HORA) + (minutos >= 120 ? "  ·  sessão longa" : "");
+            corLinha = minutos >= 120 ? new Color(0xFFB800) : new Color(0x8A8A8A);
         }
         JPanel meio = Componentes.transparente(new GridLayout(3, 1, 0, 6));
-        // Horário de início, para o atendente conferir sem abrir nada
-        meio.add(Componentes.rotulo("Início às " + s.getInicio().format(HORA)
-                + (minutos >= 120 ? "  ·  sessão longa" : ""), Font.PLAIN, 13,
-                minutos >= 120 ? new Color(0xFFB800) : new Color(0x8A8A8A)));
+        meio.add(Componentes.rotulo(linhaTempo, Font.PLAIN, 13, corLinha));
         meio.add(barra);
         JPanel valores = Componentes.transparente(new BorderLayout());
         valores.add(Componentes.rotuloIcone(Formatador.duracao(s.getDuracao()), Icone.Tipo.RELOGIO, Tema.CINZA, 15), BorderLayout.WEST);
-        valores.add(Componentes.rotuloIcone(Formatador.moeda(s.getValor()), Icone.Tipo.MOEDA, Tema.AMARELO, 15), BorderLayout.EAST);
+        // valor que falta pagar agora (já descontada a entrada da reserva, se veio de uma)
+        javax.swing.JLabel valor = Componentes.rotuloIcone(Formatador.moeda(s.getAPagar()), Icone.Tipo.MOEDA, Tema.AMARELO, 15);
+        if (s.getEntradaPaga().signum() > 0) {
+            valor.setToolTipText("Entrada de " + Formatador.moeda(s.getEntradaPaga()) + " já paga na reserva");
+        }
+        valores.add(valor, BorderLayout.EAST);
         meio.add(valores);
 
         BotaoGeeks encerrar = new BotaoGeeks("Encerrar sessão", Icone.Tipo.RAIO, BotaoGeeks.Estilo.CONTORNO);
