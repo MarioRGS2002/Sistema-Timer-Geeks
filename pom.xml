@@ -6,7 +6,7 @@
 
     <groupId>geeks</groupId>
     <artifactId>sistema-geeks</artifactId>
-    <version>1.0.3</version>
+    <version>1.0.4</version>
     <packaging>jar</packaging>
     <name>Sistema Geeks</name>
 

@@ -18,7 +18,7 @@ param(
     [string]$Jdk = $env:JAVA_HOME,
     [string]$Wix = (Join-Path $env:USERPROFILE 'tools\wix314'),
     [string]$Mvn = '',
-    [string]$Versao = '1.0.3',
+    [string]$Versao = '1.0.4',
     [switch]$SemBuild
 )
 $ErrorActionPreference = 'Stop'
