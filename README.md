@@ -215,6 +215,19 @@ powershell -ExecutionPolicy Bypass -File db\backup\agendar_backup.ps1      # tod
 | Encerrar sessão | grava **o mesmo horário e valor mostrados** na janela |
 | Nova sessão | reserva de outro cliente **já em andamento** também bloqueia o equipamento |
 | Funcionários | dois gerentes desativando um ao outro ao mesmo tempo não travam o banco |
+
+### Dia a dia (versão 1.0.4)
+
+| Onde | O que foi feito |
+|---|---|
+| **Caixa** (só gerente) | fechamento do dia: total e total por forma de pagamento, cada pagamento com cliente, tipo e quem recebeu; navega por data |
+| **Estorno** (só gerente) | no Caixa, botão Estornar: devolve parte ou todo um pagamento, com motivo obrigatório. O pagamento original não muda; o estorno fica na tabela `estorno` (migration V6) e o faturamento o desconta **na data do estorno** |
+| Sessões | botão **Mais tempo** nas sessões de tempo fechado (conta do fim combinado; recusa se bater na reserva de outro cliente) |
+| Sessão esquecida | aviso quando uma sessão de tempo livre passa de `geeks.sessaoLongaHoras` (padrão 6 h); o **gerente** encerra informando a **saída real** (a primeira vez que deu aquela hora depois do início). Fica gravado quem corrigiu (`sessao.fim_corrigido_por`) e o pagamento entra no caixa de **hoje** |
+| Reservas | em "Gerenciar reservas", reserva cujo horário já passou é marcada como **não compareceu** (`NAO_COMPARECEU`); a entrada paga fica com a loja |
+| Histórico | ficha "Dados do usuário" com botão **Editar dados** (nome, nascimento, telefone e responsável; o CPF não muda) |
+| Sessões | a pílula "R$ X hoje" só aparece para o gerente (o model também recusa para o atendente) |
+| Janela | o sistema abre **maximizado** |
 ## Decisões a confirmar com a loja
 
 - Depois da 1ª hora, o tempo ABERTO é cobrado proporcional ao uso (por segundo, arredondado ao centavo).
