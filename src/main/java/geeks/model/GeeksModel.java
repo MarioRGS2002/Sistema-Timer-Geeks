@@ -186,6 +186,34 @@ public class GeeksModel {
         return Transacao.consultar(pagamentoDAO::formas);
     }
 
+    /** Assinatura do Clube vencendo (ou vencida há pouco), para a loja cobrar a renovação. */
+    public record ClubeVencendo(Cliente cliente, LocalDate fim) {
+        public long diasParaVencer() {
+            return java.time.temporal.ChronoUnit.DAYS.between(LocalDate.now(), fim);
+        }
+    }
+
+    /** Assinaturas ativas que vencem nos próximos {@code dias} ou venceram nos últimos {@code dias}. */
+    public List<ClubeVencendo> clubeVencendo(int dias) {
+        LocalDate hoje = LocalDate.now();
+        return Transacao.consultar(c -> {
+            Map<Integer, Cliente> clientes = clientesPorId(c, hoje);
+            List<ClubeVencendo> l = new ArrayList<>();
+            for (Object[] r : assinaturaDAO.vencendo(c, hoje.minusDays(dias), hoje.plusDays(dias))) {
+                Cliente cl = clientes.get((int) r[0]);
+                if (cl != null) {
+                    l.add(new ClubeVencendo(cl, (LocalDate) r[1]));
+                }
+            }
+            return l;
+        });
+    }
+
+    /** Último dia do Clube do cliente (null = não assina ou cancelou). */
+    public LocalDate clubeAte(Cliente cliente) {
+        return Transacao.consultar(c -> assinaturaDAO.fimDaAtiva(c, cliente.getIdCliente()));
+    }
+
     /** Ficha completa do cliente (janela "Dados do usuário"); null se não existir. */
     public FichaCliente getFicha(int idCliente) {
         LocalDate hoje = LocalDate.now();
@@ -312,7 +340,7 @@ public class GeeksModel {
         int idFuncionario = Contexto.idFuncionario();
         LocalDateTime agora = LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS);
         int idSessao = Transacao.executar(c -> {
-            equipamentoDAO.travar(c, dispositivo.getIdEquipamento());
+            travarUtilizavel(c, dispositivo.getIdEquipamento());
             if (sessaoDAO.clienteEmSessaoAtiva(c, cliente.getIdCliente())) {
                 throw new IllegalStateException(cliente.getNome() + " já está em uma sessão ativa.");
             }
@@ -348,6 +376,52 @@ public class GeeksModel {
             }
         });
         return getSessoesAtivas().stream().filter(s -> s.getIdSessao() == idSessao).findFirst().orElse(null);
+    }
+
+    /**
+     * Acrescenta um jogador à sessão (ex.: amigos no mesmo console). Quem paga continua sendo o
+     * titular; o preço é por equipamento. Respeita o máximo de jogadores do tipo e não deixa o
+     * cliente estar em duas sessões ao mesmo tempo.
+     */
+    public void adicionarJogador(String idSessao, Cliente cliente) {
+        int id = idNumerico(idSessao, "S");
+        Transacao.executar(c -> {
+            SessaoDAO.Linha s = sessaoDAO.travarAtiva(c, id);
+            if (sessaoDAO.clienteEmSessaoAtiva(c, cliente.getIdCliente())) {
+                throw new IllegalStateException(cliente.getNome() + " já está em uma sessão ativa.");
+            }
+            if (sessaoDAO.participantes(c, id) >= s.maxParticipantes) {
+                Dispositivo d = dispositivoPorId.get(s.idEquipamento);
+                throw new IllegalStateException((d == null ? "Esse equipamento" : d.getNome()) + " aceita no máximo "
+                        + s.maxParticipantes + (s.maxParticipantes == 1 ? " jogador." : " jogadores."));
+            }
+            sessaoDAO.adicionarJogador(c, id, cliente.getIdCliente());
+            return null;
+        });
+    }
+
+    /** Trava o equipamento e recusa se estiver em manutenção (a tela pode estar desatualizada). */
+    private void travarUtilizavel(Connection c, int idEquipamento) throws SQLException {
+        if ("INDISPONIVEL".equals(equipamentoDAO.statusTravando(c, idEquipamento))) {
+            Dispositivo d = dispositivoPorId.get(idEquipamento);
+            throw new IllegalStateException((d == null ? "Esse equipamento" : d.getNome()) + " está em manutenção.");
+        }
+    }
+
+    /** Relê a lista de equipamentos (depois de cadastrar ou mudar manutenção na tela Loja). */
+    public void recarregarDispositivos() {
+        List<Dispositivo> novos = Transacao.consultar(c -> {
+            equipamentoDAO.carregarTiposEPlano(c);
+            return equipamentoDAO.listarUtilizaveis(c);
+        });
+        synchronized (dispositivos) {
+            dispositivos.clear();
+            dispositivoPorId.clear();
+            for (Dispositivo d : novos) {
+                dispositivos.add(d);
+                dispositivoPorId.put(d.getIdEquipamento(), d);
+            }
+        }
     }
 
     private static String sugestao(List<String> livres) {
@@ -552,6 +626,7 @@ public class GeeksModel {
         return Transacao.consultar(c -> {
             List<SessaoDAO.Linha> linhas = sessaoDAO.ativas(c);
             Map<Integer, Cliente> clientes = clientesPorId(c, hoje);
+            Map<Integer, List<String>> jogadores = sessaoDAO.jogadoresAtivos(c);
             List<Sessao> lista = new ArrayList<>();
             for (SessaoDAO.Linha l : linhas) {
                 Cliente cl = clientes.get(l.idCliente);
@@ -559,7 +634,9 @@ public class GeeksModel {
                 if (cl != null && cl.getPlano() == Plano.CLUBE && assinaturaDAO.emDia(c, l.idCliente, l.inicio.toLocalDate())) {
                     gratis = Math.max(0, Cobranca.SEGUNDOS_HORA - sessaoDAO.gratisUsadoNoDia(c, l.idCliente, l.inicio.toLocalDate()));
                 }
-                lista.add(montar(l, cl, gratis));
+                Sessao s = montar(l, cl, gratis);
+                s.definirJogadores(jogadores.get(l.idSessao), l.maxParticipantes);
+                lista.add(s);
             }
             return lista;
         });
@@ -668,7 +745,7 @@ public class GeeksModel {
         BigDecimal entrada = entradaReserva(dispositivo, minutos);
         Integer idFuncionario = formaEntrada == null ? null : Contexto.idFuncionario();
         int id = Transacao.executar(c -> {
-            equipamentoDAO.travar(c, dispositivo.getIdEquipamento());
+            travarUtilizavel(c, dispositivo.getIdEquipamento());
             verificarConflito(c, dispositivo, 0, dataHora, fim, agora, ignorarAviso);
             int r = reservaDAO.inserir(c, dataHora, fim, valor, Regras.PERCENTUAL_ENTRADA, entrada,
                     cliente.getIdCliente(), dispositivo.getIdEquipamento());
@@ -693,7 +770,7 @@ public class GeeksModel {
             throw new IllegalArgumentException("A reserva precisa ser para um horário futuro.");
         }
         Transacao.executar(c -> {
-            equipamentoDAO.travar(c, reserva.getDispositivo().getIdEquipamento());
+            travarUtilizavel(c, reserva.getDispositivo().getIdEquipamento());
             ReservaDAO.Linha atual = reservaDAO.travar(c, reserva.getIdReserva());
             long duracao = ChronoUnit.MINUTES.between(atual.inicio, atual.fim);
             LocalDateTime novoFim = novaDataHora.plusMinutes(duracao);

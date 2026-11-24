@@ -38,6 +38,12 @@ public class PainelSessoes extends PainelPagina {
     private ActionListener listenerEncerrar;
     private ActionListener listenerNova;
     private ActionListener listenerMaisTempo;
+    private ActionListener listenerJogador;
+
+    /** O actionCommand do evento é o id da sessão. Só aparece quando o equipamento aceita mais jogadores. */
+    public void addListenerAdicionarJogador(ActionListener listener) {
+        this.listenerJogador = listener;
+    }
 
     public PainelSessoes() {
         super("Sessões ativas");
@@ -136,6 +142,20 @@ public class PainelSessoes extends PainelPagina {
         JPanel linhaChip = Componentes.transparente(new FlowLayout(FlowLayout.LEFT, 0, 0));
         linhaChip.add(new Componentes.Chip(s.getDispositivo().getNome(), Tema.corDe(s.getDispositivo().getTipo()),
                 Tema.iconeDe(s.getDispositivo().getTipo())));
+        if (!s.getJogadores().isEmpty()) {
+            javax.swing.JLabel mais = Componentes.rotulo("  +" + s.getJogadores().size(), Font.BOLD, 13, Tema.AMARELO);
+            mais.setToolTipText("Jogando junto: " + String.join(", ", s.getJogadores()));
+            linhaChip.add(mais);
+        }
+        if (s.cabeMaisJogador()) {
+            BotaoGeeks jogador = new BotaoGeeks("+ Jogador", null, BotaoGeeks.Estilo.LINK);
+            jogador.setActionCommand(s.getId());
+            jogador.setToolTipText("Acrescentar um amigo jogando junto neste equipamento");
+            if (listenerJogador != null) {
+                jogador.addActionListener(listenerJogador);
+            }
+            linhaChip.add(jogador);
+        }
         nomes.add(linhaChip);
         topo.add(nomes, BorderLayout.CENTER);
 
@@ -215,7 +235,14 @@ public class PainelSessoes extends PainelPagina {
     }
 
     private JComponent criarCartaoNova() {
-        CartaoGeeks cartao = new CartaoGeeks(Tema.CARTAO, Tema.AMARELO, true);
+        CartaoGeeks cartao = new CartaoGeeks(Tema.CARTAO, Tema.AMARELO, true) {
+            @Override
+            public java.awt.Dimension getPreferredSize() {
+                // sem sessões ativas, o cartão não fica achatado: mesma altura de um cartão de sessão
+                java.awt.Dimension d = super.getPreferredSize();
+                return new java.awt.Dimension(d.width, Math.max(d.height, 200));
+            }
+        };
         cartao.setLayout(new java.awt.GridBagLayout());
         BotaoGeeks nova = new BotaoGeeks("Iniciar nova sessão", Icone.Tipo.MAIS, BotaoGeeks.Estilo.PREENCHIDO);
         if (listenerNova != null) {

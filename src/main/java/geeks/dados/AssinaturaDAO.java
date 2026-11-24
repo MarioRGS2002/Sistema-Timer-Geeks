@@ -46,6 +46,31 @@ public class AssinaturaDAO {
                 + "WHERE id_cliente = ? AND situacao = 'ATIVA'", idCliente);
     }
 
+    /**
+     * Assinaturas ATIVAS cujo último dia está em [de, ate] (vencendo logo ou vencidas há pouco):
+     * {id_cliente, data_fim}, as que vencem primeiro primeiro.
+     */
+    public java.util.List<Object[]> vencendo(Connection c, LocalDate de, LocalDate ate) throws SQLException {
+        java.util.List<Object[]> l = new java.util.ArrayList<>();
+        try (java.sql.PreparedStatement ps = Sql.preparar(c, "SELECT a.id_cliente, a.data_fim FROM assinatura_clube AS a "
+                + "INNER JOIN cliente AS c ON c.id_cliente = a.id_cliente "
+                + "WHERE a.situacao = 'ATIVA' AND c.ativo = 1 AND a.data_fim >= ? AND a.data_fim <= ? "
+                + "ORDER BY a.data_fim, c.nome", de, ate); java.sql.ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                l.add(new Object[]{rs.getInt(1), Sql.data(rs, "data_fim")});
+            }
+        }
+        return l;
+    }
+
+    /** Último dia da assinatura ATIVA do cliente (null se não tiver). */
+    public LocalDate fimDaAtiva(Connection c, int idCliente) throws SQLException {
+        try (java.sql.PreparedStatement ps = Sql.preparar(c, "SELECT MAX(a.data_fim) AS fim FROM assinatura_clube AS a "
+                + "WHERE a.id_cliente = ? AND a.situacao = 'ATIVA'", idCliente); java.sql.ResultSet rs = ps.executeQuery()) {
+            return rs.next() ? Sql.data(rs, "fim") : null;
+        }
+    }
+
     public LocalDate dataFim(Connection c, int idAssinatura) throws SQLException {
         try (PreparedStatement ps = Sql.preparar(c, "SELECT data_fim FROM assinatura_clube WHERE id_assinatura = ?",
                 idAssinatura); ResultSet rs = ps.executeQuery()) {

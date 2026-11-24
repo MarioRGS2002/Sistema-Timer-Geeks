@@ -27,6 +27,46 @@ public class PainelClube extends PainelPagina {
     private final BotaoGeeks btCancelar = new BotaoGeeks("Cancelar assinatura", Icone.Tipo.LISTA, BotaoGeeks.Estilo.CONTORNO);
     private final JPanel areaCliente = Componentes.transparente(new BorderLayout());
     private ActionListener listenerNovoCliente;
+    private JLabel lbPreco;
+    private final JPanel listaVencendo = Componentes.transparente(new GridLayout(0, 1, 0, 6));
+    private ActionListener listenerVencendo;
+
+    /** Lista de assinaturas vencendo; clicar num nome abre o cliente para renovar. */
+    public void atualizarVencendo(java.util.List<geeks.model.GeeksModel.ClubeVencendo> lista) {
+        listaVencendo.removeAll();
+        if (lista.isEmpty()) {
+            listaVencendo.add(Componentes.rotulo("Ninguém vencendo nesses dias.", Font.PLAIN, 14, Tema.CINZA));
+        }
+        for (geeks.model.GeeksModel.ClubeVencendo v : lista.subList(0, Math.min(6, lista.size()))) {
+            long dias = v.diasParaVencer();
+            String quando = dias < 0 ? "venceu há " + (-dias) + (dias == -1 ? " dia" : " dias")
+                    : dias == 0 ? "vence hoje" : "vence em " + dias + (dias == 1 ? " dia" : " dias");
+            BotaoGeeks b = new BotaoGeeks(v.cliente().getNome() + "  ·  " + quando, Icone.Tipo.COROA, BotaoGeeks.Estilo.LINK);
+            b.setActionCommand(String.valueOf(v.cliente().getIdCliente()));
+            b.setHorizontalAlignment(javax.swing.SwingConstants.LEFT);
+            if (listenerVencendo != null) {
+                b.addActionListener(listenerVencendo);
+            }
+            listaVencendo.add(b);
+        }
+        if (lista.size() > 6) {
+            listaVencendo.add(Componentes.rotulo("e mais " + (lista.size() - 6) + "...", Font.PLAIN, 13, Tema.CINZA));
+        }
+        listaVencendo.revalidate();
+        listaVencendo.repaint();
+    }
+
+    /** O actionCommand do evento é o id do cliente. */
+    public void addListenerVencendo(ActionListener l) {
+        this.listenerVencendo = l;
+    }
+
+    /** Mostra a mensalidade atual (depois de o gerente mudar o preço na tela Loja). */
+    public void atualizarPreco() {
+        if (lbPreco != null) {
+            lbPreco.setText(Formatador.moeda(Plano.CLUBE.getValor()));
+        }
+    }
 
     public PainelClube() {
         super("Clube Geeks");
@@ -46,6 +86,12 @@ public class PainelClube extends PainelPagina {
         envoltorio.add(areaCliente, BorderLayout.NORTH);
         esquerda.add(busca, BorderLayout.NORTH);
         esquerda.add(envoltorio, BorderLayout.CENTER);
+        // quem vence nos próximos dias (ou venceu há pouco): para cobrar a renovação no balcão
+        JPanel vencendo = Componentes.transparente(new BorderLayout(0, 8));
+        vencendo.add(Componentes.rotuloIcone("Vencendo (7 dias antes e depois)", Icone.Tipo.CALENDARIO, Tema.AMARELO, 16),
+                BorderLayout.NORTH);
+        vencendo.add(listaVencendo, BorderLayout.CENTER);
+        esquerda.add(vencendo, BorderLayout.SOUTH);
 
         JPanel direita = Componentes.transparente(new BorderLayout(0, 16));
         direita.add(Componentes.rotuloIcone("Assinatura do clube", Icone.Tipo.ESTRELA, Tema.AMARELO, 22), BorderLayout.NORTH);
@@ -78,7 +124,8 @@ public class PainelClube extends PainelPagina {
         c.add(bloco);
         c.add(Box.createVerticalStrut(8));
         c.add(centralizar(Componentes.rotulo(plano.getNome(), Font.BOLD | Font.ITALIC, 30, Tema.FUNDO)));
-        c.add(centralizar(Componentes.rotulo(Formatador.moeda(plano.getValor()), Font.BOLD | Font.ITALIC, 40, Tema.FUNDO)));
+        lbPreco = Componentes.rotulo(Formatador.moeda(plano.getValor()), Font.BOLD | Font.ITALIC, 40, Tema.FUNDO);
+        c.add(centralizar(lbPreco));
         c.add(Box.createVerticalStrut(12));
         JPanel beneficios = Componentes.transparente(new GridLayout(0, 1, 0, 6));
         for (String b : plano.getBeneficios()) {
@@ -111,6 +158,11 @@ public class PainelClube extends PainelPagina {
     }
 
     public void mostrarCliente(Cliente c) {
+        mostrarCliente(c, null);
+    }
+
+    /** @param clubeAte último dia do Clube (null = não sabe / não assina) */
+    public void mostrarCliente(Cliente c, java.time.LocalDate clubeAte) {
         areaCliente.removeAll();
         boolean assinante = c.getPlano() != Plano.NENHUM;
         JPanel info = Componentes.transparente(new BorderLayout(14, 0));
@@ -119,8 +171,13 @@ public class PainelClube extends PainelPagina {
         textos.add(Componentes.rotulo(c.getNome(), Font.BOLD, 20, Tema.BRANCO));
         textos.add(Componentes.rotulo("CPF " + Formatador.cpf(c.getCpf()) + "  |  " + c.getTelefone(), Font.PLAIN, 14, Tema.CINZA));
         JPanel linhaChip = Componentes.transparente(new FlowLayout(FlowLayout.LEFT, 0, 2));
-        linhaChip.add(new Componentes.Chip(assinante ? "Assinante Clube Geeks" : "Sem plano",
-                assinante ? Tema.AMARELO : Tema.CINZA, Icone.Tipo.COROA));
+        String chip = assinante
+                ? (clubeAte != null ? "Clube até " + clubeAte.format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy"))
+                : "Assinante Clube Geeks")
+                : clubeAte != null ? "Clube vencido em " + clubeAte.format(java.time.format.DateTimeFormatter.ofPattern("dd/MM"))
+                : "Sem plano";
+        linhaChip.add(new Componentes.Chip(chip, assinante ? Tema.AMARELO : clubeAte != null ? Tema.VERMELHO : Tema.CINZA,
+                Icone.Tipo.COROA));
         textos.add(linhaChip);
         info.add(textos, BorderLayout.CENTER);
         areaCliente.add(info, BorderLayout.NORTH);
@@ -146,8 +203,9 @@ public class PainelClube extends PainelPagina {
 
     private void atualizarPlano(Cliente c) {
         boolean assinante = c != null && c.getPlano() != Plano.NENHUM;
-        btAssinar.setText(assinante ? "Plano ativo" : "Assinar");
-        btAssinar.setEnabled(c != null && !assinante);
+        // assinante em dia pode renovar antes de vencer: o novo mês começa no fim do atual
+        btAssinar.setText(assinante ? "Renovar (+1 mês)" : "Assinar");
+        btAssinar.setEnabled(c != null);
         btCancelar.setEnabled(assinante);
     }
 

@@ -47,6 +47,8 @@ public class GeeksController {
     private final FaturamentoModel faturamento = new FaturamentoModel();
     private final FuncionariosModel funcionarios = new FuncionariosModel();
     private final geeks.model.CaixaModel caixa = new geeks.model.CaixaModel();
+    private final geeks.model.LojaModel loja = new geeks.model.LojaModel();
+    private final geeks.model.RelatoriosModel relatorios = new geeks.model.RelatoriosModel();
     private LocalDate diaCaixa = LocalDate.now();
     private final int idLogado;
     private Timer timer;
@@ -72,6 +74,7 @@ public class GeeksController {
             ligarFaturamento();
             ligarFuncionarios();
             ligarCaixa();
+            ligarLoja();
         }
         if (usuario != null) {
             view.setUsuario(usuario.getNome(), usuario.getPerfil().getRotulo());
@@ -98,14 +101,20 @@ public class GeeksController {
         view.addListenerNavegacao(e -> {
             String tela = e.getActionCommand();
             if ((JanelaPrincipal.FATURAMENTO.equals(tela) || JanelaPrincipal.FUNCIONARIOS.equals(tela)
-                    || JanelaPrincipal.CAIXA.equals(tela)) && !gerente) {
-                return; // faturamento, caixa e funcionários são exclusivos do gerente
+                    || JanelaPrincipal.CAIXA.equals(tela) || JanelaPrincipal.LOJA.equals(tela)) && !gerente) {
+                return; // faturamento, caixa, funcionários e loja são exclusivos do gerente
             }
             if (JanelaPrincipal.FUNCIONARIOS.equals(tela)) {
                 atualizarFuncionarios();
             }
             if (JanelaPrincipal.CAIXA.equals(tela)) {
                 atualizarCaixa();
+            }
+            if (JanelaPrincipal.CLUBE.equals(tela)) {
+                view.getPainelClube().atualizarVencendo(model.clubeVencendo(7));
+            }
+            if (JanelaPrincipal.LOJA.equals(tela)) {
+                atualizarLoja();
             }
             view.mostrarTela(tela);
         });
@@ -115,6 +124,7 @@ public class GeeksController {
         view.getPainelSessoes().addListenerNovaSessao(e -> novaSessao());
         view.getPainelSessoes().addListenerEncerrarSessao(e -> encerrarSessao(e.getActionCommand()));
         view.getPainelSessoes().addListenerMaisTempo(e -> maisTempo(e.getActionCommand()));
+        view.getPainelSessoes().addListenerAdicionarJogador(e -> adicionarJogador(e.getActionCommand()));
     }
 
     private void ligarReservas() {
@@ -149,6 +159,10 @@ public class GeeksController {
         view.getPainelClube().addListenerAssinar(e -> assinarPlano(Plano.valueOf(e.getActionCommand())));
         view.getPainelClube().addListenerCancelar(e -> cancelarAssinatura());
         view.getPainelClube().addListenerNovoCliente(e -> view.mostrarTela(JanelaPrincipal.CADASTROS));
+        view.getPainelClube().addListenerVencendo(e -> {
+            clienteDoClube = model.getFicha(Integer.parseInt(e.getActionCommand())).getCliente();
+            mostrarClienteDoClube();
+        });
     }
 
     private void ligarCadastro() {
@@ -194,6 +208,7 @@ public class GeeksController {
         boolean podeAvancar = !periodoFaturamento.inicio(periodoFaturamento.deslocar(referenciaFaturamento, 1)).isAfter(hoje);
         boolean periodoAtual = periodoFaturamento.inicio(referenciaFaturamento).equals(periodoFaturamento.inicio(hoje));
         view.getPainelFaturamento().atualizar(serie, podeAvancar, periodoAtual);
+        view.getPainelFaturamento().atualizarRelatorios(relatorios.periodo(periodoFaturamento, referenciaFaturamento));
     }
 
     // ---------- Caixa e estorno (somente gerente) ----------
@@ -220,8 +235,8 @@ public class GeeksController {
     }
 
     private void estornar(int idPagamento) {
-        geeks.dados.CaixaDAO.Pagamento pag = caixa.dia(diaCaixa).pagamentos.stream()
-                .filter(x -> x.idPagamento == idPagamento).findFirst().orElse(null);
+        geeks.model.LancamentoCaixa.Pagamento pag = caixa.dia(diaCaixa).pagamentos.stream()
+                .filter(x -> x.idPagamento() == idPagamento).findFirst().orElse(null);
         if (pag == null) {
             return;
         }
@@ -241,6 +256,80 @@ public class GeeksController {
             atualizarFaturamento();
             Dialogos.sucesso(view, "Estorno de " + Formatador.moeda(valor) + " registrado.");
         } catch (IllegalArgumentException | IllegalStateException ex) {
+            Dialogos.erro(view, ex.getMessage());
+        }
+    }
+
+    // ---------- Loja: equipamentos e preços (somente gerente) ----------
+
+    private void ligarLoja() {
+        var p = view.getPainelLoja();
+        p.addListenerSalvarPrecos(e -> salvarPrecos());
+        p.addListenerAdicionar(e -> {
+            try {
+                loja.cadastrar(p.getNomeEquipamento(), p.getTipoEquipamento());
+                p.limparNovoEquipamento();
+                depoisDeMudarEquipamentos();
+            } catch (IllegalArgumentException | IllegalStateException ex) {
+                Dialogos.erro(view, ex.getMessage());
+            }
+        });
+        p.addListenerManutencao(e -> {
+            String[] partes = e.getActionCommand().split(":", 3);
+            boolean colocar = "manutencao".equals(partes[1]);
+            if (colocar && !Dialogos.confirmar(view, "Manutenção", partes[2] + " vai sumir das telas de sessão e de "
+                    + "reserva até você clicar em \"Voltar a usar\".", "Colocar em manutenção", true)) {
+                return;
+            }
+            try {
+                int reservas = loja.manutencao(Integer.parseInt(partes[0]), colocar);
+                depoisDeMudarEquipamentos();
+                if (colocar && reservas > 0) {
+                    Dialogos.info(view, partes[2] + " tem " + reservas + (reservas == 1 ? " reserva marcada" : " reservas marcadas")
+                            + ". Veja em Reservas e combine outro equipamento com o cliente.");
+                }
+            } catch (IllegalArgumentException | IllegalStateException ex) {
+                Dialogos.erro(view, ex.getMessage());
+            }
+        });
+    }
+
+    private void atualizarLoja() {
+        view.getPainelLoja().atualizarPrecos(loja.precos());
+        view.getPainelLoja().atualizarEquipamentos(loja.equipamentos(), loja.tipos());
+    }
+
+    private void depoisDeMudarEquipamentos() {
+        model.recarregarDispositivos();
+        atualizarLoja();
+        atualizarSessoes();
+        atualizarReservas();
+    }
+
+    private void salvarPrecos() {
+        java.util.Map<String, String> digitados = view.getPainelLoja().getPrecosDigitados();
+        java.util.Map<String, BigDecimal> tipos = new java.util.LinkedHashMap<>();
+        BigDecimal clube = null;
+        for (java.util.Map.Entry<String, String> e : digitados.entrySet()) {
+            BigDecimal v = geeks.model.CaixaModel.lerValor(e.getValue());
+            if (v == null) {
+                Dialogos.erro(view, "Preço inválido em " + e.getKey() + ". Use por exemplo 10,00.");
+                return;
+            }
+            if (e.getKey().equals(Plano.CLUBE.getNome())) {
+                clube = v;
+            } else {
+                tipos.put(e.getKey(), v);
+            }
+        }
+        try {
+            loja.alterarPrecos(tipos, clube);
+            model.recarregarDispositivos();
+            view.getPainelClube().atualizarPreco();
+            atualizarLoja();
+            atualizarSessoes();
+            Dialogos.sucesso(view, "Preços salvos. Valem para as sessões que começarem a partir de agora.");
+        } catch (IllegalArgumentException ex) {
             Dialogos.erro(view, ex.getMessage());
         }
     }
@@ -485,6 +574,35 @@ public class GeeksController {
         });
     }
 
+    private void adicionarJogador(String id) {
+        List<Sessao> ativas = model.getSessoesAtivas();
+        Sessao sessao = ativas.stream().filter(s -> s.getId().equals(id)).findFirst().orElse(null);
+        if (sessao == null) {
+            return;
+        }
+        // só quem não está jogando agora (nem como titular, nem como acompanhante)
+        java.util.Set<String> ocupados = new java.util.HashSet<>();
+        for (Sessao s : ativas) {
+            ocupados.add(s.getCliente().getNome());
+            ocupados.addAll(s.getJogadores());
+        }
+        List<Cliente> livres = model.getClientes().stream().filter(c -> !ocupados.contains(c.getNome())).toList();
+        if (livres.isEmpty()) {
+            Dialogos.info(view, "Todos os clientes cadastrados já estão jogando. Cadastre o amigo em Cadastros.");
+            return;
+        }
+        Cliente amigo = Dialogos.escolherJogador(view, sessao.getDispositivo().getNome(), livres);
+        if (amigo == null) {
+            return;
+        }
+        try {
+            model.adicionarJogador(id, amigo);
+            atualizarSessoes();
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            Dialogos.erro(view, ex.getMessage());
+        }
+    }
+
     private void maisTempo(String id) {
         Sessao sessao = model.getSessoesAtivas().stream().filter(s -> s.getId().equals(id)).findFirst().orElse(null);
         if (sessao == null || sessao.getPrevisto() == null) {
@@ -616,7 +734,7 @@ public class GeeksController {
         if (achados.isEmpty()) {
             view.getPainelClube().mostrarNaoEncontrado(termo.trim());
         } else if (clienteDoClube != null) {
-            view.getPainelClube().mostrarCliente(clienteDoClube);
+            mostrarClienteDoClube();
         }
     }
 
@@ -628,9 +746,15 @@ public class GeeksController {
         String forma = Dialogos.pedirPagamento(view, "Assinar clube", msg, plano.getValor(), model.getFormasPagamento(), "Assinar");
         if (forma != null) {
             model.assinarPlano(clienteDoClube, plano, forma);
-            view.getPainelClube().mostrarCliente(clienteDoClube);
+            mostrarClienteDoClube();
             Dialogos.sucesso(view, clienteDoClube.getNome() + " agora faz parte do Clube Geeks!");
         }
+    }
+
+    /** Mostra o cliente escolhido no Clube (com até quando vai o plano) e atualiza a lista de quem está vencendo. */
+    private void mostrarClienteDoClube() {
+        view.getPainelClube().mostrarCliente(clienteDoClube, model.clubeAte(clienteDoClube));
+        view.getPainelClube().atualizarVencendo(model.clubeVencendo(7));
     }
 
     private void cancelarAssinatura() {
@@ -640,7 +764,7 @@ public class GeeksController {
         if (Dialogos.confirmar(view, "Cancelar assinatura", "Cancelar a assinatura de " + clienteDoClube.getNome() + "?",
                 "Cancelar assinatura", true)) {
             model.assinarPlano(clienteDoClube, Plano.NENHUM);
-            view.getPainelClube().mostrarCliente(clienteDoClube);
+            mostrarClienteDoClube();
         }
     }
 
@@ -656,7 +780,7 @@ public class GeeksController {
             Dialogos.sucesso(view, "Cliente " + novo.getNome() + " cadastrado com sucesso!");
             if (escolherPlano) {
                 clienteDoClube = novo;
-                view.getPainelClube().mostrarCliente(novo);
+                mostrarClienteDoClube();
                 view.mostrarTela(JanelaPrincipal.CLUBE);
             }
         } catch (IllegalArgumentException ex) {

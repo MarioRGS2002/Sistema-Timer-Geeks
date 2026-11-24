@@ -80,7 +80,7 @@ public final class Dialogos {
     }
 
     /** {valor digitado, motivo} do estorno, ou null se cancelar. */
-    public static String[] pedirEstorno(Component pai, geeks.dados.CaixaDAO.Pagamento p) {
+    public static String[] pedirEstorno(Component pai, geeks.model.LancamentoCaixa.Pagamento p) {
         FormEstorno form = new FormEstorno(p);
         return exibir(pai, "Estornar pagamento", form) ? new String[]{form.getValor(), form.getMotivo()} : null;
     }
@@ -126,6 +126,13 @@ public final class Dialogos {
     public static FormEditarCliente editarCliente(Component pai, geeks.model.FichaCliente ficha, String[] valores) {
         FormEditarCliente form = new FormEditarCliente(ficha, valores);
         return exibir(pai, "Editar cliente", form) ? form : null;
+    }
+
+    /** Escolher o amigo que vai jogar junto na sessão. Retorna o escolhido ou null. */
+    public static Cliente escolherJogador(Component pai, String equipamento, List<Cliente> clientes) {
+        FormEscolherCliente form = new FormEscolherCliente("Adicionar jogador", "Quem vai jogar junto em " + equipamento + "?",
+                "Adicionar", clientes);
+        return exibir(pai, "Adicionar jogador", form) ? form.getSelecionado() : null;
     }
 
     /** Escolher entre vários clientes com nome parecido (busca do Clube). Retorna o escolhido ou null. */

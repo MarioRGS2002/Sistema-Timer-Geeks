@@ -27,6 +27,7 @@ public class PainelFaturamento extends PainelPagina {
     private final BotaoGeeks btProximo = new BotaoGeeks(">", null, BotaoGeeks.Estilo.CONTORNO);
     private final BotaoGeeks btHoje = new BotaoGeeks("Hoje", null, BotaoGeeks.Estilo.LINK);
     private SerieFaturamento ultima;
+    private final JPanel relatorios = Componentes.transparente(new GridLayout(1, 3, 16, 0));
 
     public PainelFaturamento() {
         super("Faturamento");
@@ -56,6 +57,39 @@ public class PainelFaturamento extends PainelPagina {
 
         getCorpo().add(resumo, BorderLayout.NORTH);
         getCorpo().add(cartaoGrafico, BorderLayout.CENTER);
+        relatorios.setBorder(new EmptyBorder(16, 0, 0, 0));
+        getCorpo().add(relatorios, BorderLayout.SOUTH);
+    }
+
+    /** Relatórios do mesmo período do gráfico: equipamentos mais usados, horários de pico e clientes frequentes. */
+    public void atualizarRelatorios(geeks.model.RelatoriosModel.Relatorio r) {
+        relatorios.removeAll();
+        relatorios.add(listaRelatorio("Equipamentos mais usados", Icone.Tipo.CONTROLE, r.equipamentos()));
+        relatorios.add(listaRelatorio("Horários de pico", Icone.Tipo.RELOGIO, r.pico()));
+        relatorios.add(listaRelatorio("Clientes mais frequentes", Icone.Tipo.USUARIO_MAIS, r.clientes()));
+        relatorios.revalidate();
+        relatorios.repaint();
+    }
+
+    private javax.swing.JComponent listaRelatorio(String titulo, Icone.Tipo icone,
+                                                  java.util.List<geeks.model.RelatoriosModel.Linha> linhas) {
+        CartaoGeeks c = new CartaoGeeks();
+        c.setLayout(new BorderLayout(0, 8));
+        c.setBorder(new EmptyBorder(12, 16, 12, 16));
+        c.add(Componentes.rotuloIcone(titulo, icone, Tema.AMARELO, 15), BorderLayout.NORTH);
+        JPanel l = Componentes.transparente(new java.awt.GridLayout(0, 1, 0, 4));
+        if (linhas.isEmpty()) {
+            l.add(Componentes.rotulo("Sem sessões neste período.", Font.PLAIN, 13, Tema.CINZA));
+        }
+        int pos = 1;
+        for (geeks.model.RelatoriosModel.Linha linha : linhas) {
+            JPanel item = Componentes.transparente(new BorderLayout(8, 0));
+            item.add(Componentes.rotulo(pos++ + ". " + linha.rotulo(), Font.BOLD, 14, Tema.BRANCO), BorderLayout.WEST);
+            item.add(Componentes.rotulo(linha.detalhe(), Font.PLAIN, 13, Tema.CINZA), BorderLayout.EAST);
+            l.add(item);
+        }
+        c.add(l, BorderLayout.CENTER);
+        return c;
     }
 
     /**

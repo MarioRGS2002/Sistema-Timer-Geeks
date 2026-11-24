@@ -40,6 +40,7 @@ public class JanelaPrincipal extends JFrame {
     public static final String FATURAMENTO = "FATURAMENTO";
     public static final String FUNCIONARIOS = "FUNCIONARIOS";
     public static final String CAIXA = "CAIXA";
+    public static final String LOJA = "LOJA";
 
     private final CardLayout cartas = new CardLayout();
     private final JPanel conteudo = new JPanel(cartas);
@@ -51,6 +52,7 @@ public class JanelaPrincipal extends JFrame {
     private PainelFaturamento painelFaturamento;
     private PainelFuncionarios painelFuncionarios;
     private PainelCaixa painelCaixa;
+    private PainelLoja painelLoja;
     private final JLabel lbUsuario = Componentes.rotulo(" ", Font.PLAIN, 14, Tema.BRANCO);
     private final BotaoGeeks btSair = new BotaoGeeks("Sair", Icone.Tipo.SETA_ESQUERDA, BotaoGeeks.Estilo.CONTORNO);
     private Timer timerRelogio;
@@ -84,6 +86,8 @@ public class JanelaPrincipal extends JFrame {
             registrar(CAIXA, painelCaixa);
             painelFuncionarios = new PainelFuncionarios();
             registrar(FUNCIONARIOS, painelFuncionarios);
+            painelLoja = new PainelLoja();
+            registrar(LOJA, painelLoja);
         }
         add(conteudo, BorderLayout.CENTER);
 
@@ -127,6 +131,7 @@ public class JanelaPrincipal extends JFrame {
             adicionarItem(menu, FATURAMENTO, "Faturamento", Icone.Tipo.MOEDA);
             adicionarItem(menu, CAIXA, "Caixa", Icone.Tipo.LISTA);
             adicionarItem(menu, FUNCIONARIOS, "Funcionários", Icone.Tipo.CADEADO);
+            adicionarItem(menu, LOJA, "Loja", Icone.Tipo.CUBO);
         }
         menu.add(Box.createVerticalGlue());
         menu.add(criarUsuarioESair());
@@ -246,6 +251,11 @@ public class JanelaPrincipal extends JFrame {
     /** Só existe quando o usuário logado é gerente (senão devolve null). */
     public PainelFaturamento getPainelFaturamento() {
         return painelFaturamento;
+    }
+
+    /** Só existe quando o usuário logado é gerente (senão devolve null). */
+    public PainelLoja getPainelLoja() {
+        return painelLoja;
     }
 
     /** Só existe quando o usuário logado é gerente (senão devolve null). */
