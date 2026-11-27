@@ -20,8 +20,10 @@ public class TelaLogin extends JFrame {
             setIconImages(icones);
         }
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        setResizable(false);
+        // botão de maximizar (tela cheia) na barra de título; não encolhe além do tamanho normal
+        setResizable(true);
         pack();
+        setMinimumSize(getSize());
         setLocationRelativeTo(null);
         getRootPane().setDefaultButton(painel.getBotaoEntrar()); // Enter também entra
         addWindowListener(new WindowAdapter() {
